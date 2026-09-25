@@ -1,0 +1,368 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  STAFF
+  ACCOUNTANT
+}
+
+enum Unit {
+  KG
+  GRAM
+  BAG
+  PIECE
+}
+
+enum InvoiceType {
+  GST_INVOICE
+  NON_GST_INVOICE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+}
+
+enum PaymentType {
+  CASH
+  UPI
+  CREDIT
+}
+
+enum StockMovementType {
+  PURCHASE
+  SALE
+  STOCK_IN
+  STOCK_OUT
+  DAMAGED
+  ADJUSTMENT
+}
+
+enum StockMovementStatus {
+  PENDING
+  POSTED
+  REJECTED
+}
+
+enum MarketLocation {
+  MUMBAI
+  PUNE
+  SOLAPUR
+  DHARASHIV
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String?
+  name      String
+  phone     String?
+  role      UserRole @default(STAFF)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoicesCreated Invoice[] @relation("InvoiceCreatedBy")
+
+  @@index([email])
+  @@index([role])
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  nameMarathi String?
+  slug        String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+
+  @@index([slug])
+}
+
+model Product {
+  id                String   @id @default(cuid())
+  name              String
+  marathiName       String?
+  sku               String   @unique
+  categoryId        String
+  unit              Unit
+  hsnCode           String?
+  gstPercentage     Float    @default(5)
+  purchaseRate      Float
+  sellingRate       Float
+  currentStock      Float    @default(0)
+  minimumStockLevel Float    @default(0)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  category       Category        @relation(fields: [categoryId], references: [id])
+  purchaseItems  PurchaseItem[]
+  invoiceItems   InvoiceItem[]
+  stockMovements StockMovement[]
+  rateHistories  RateHistory[]
+
+  @@index([categoryId])
+  @@index([sku])
+}
+
+model Supplier {
+  id                String   @id @default(cuid())
+  name              String
+  contactPerson     String?
+  mobile            String
+  whatsapp          String?
+  city              String
+  address           String
+  gstNumber         String?
+  productCategories String[] @default([])
+  rating            Float    @default(0)
+  notes             String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  purchases      Purchase[]
+  paymentHistory SupplierPayment[]
+
+  @@index([city])
+  @@index([name])
+}
+
+model Customer {
+  id                String   @id @default(cuid())
+  name              String
+  mobile            String   @unique
+  address           String
+  gstNumber         String?
+  creditLimit       Float    @default(0)
+  outstandingAmount Float    @default(0)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  invoices       Invoice[]
+  paymentHistory CustomerPayment[]
+  ledgerEntries  Ledger[]
+
+  @@index([name])
+  @@index([mobile])
+}
+
+model Purchase {
+  id            String   @id @default(cuid())
+  supplierId    String
+  invoiceNumber String   @unique
+  purchaseDate  DateTime
+  taxableAmount Float    @default(0)
+  totalAmount   Float
+  gstAmount     Float    @default(0)
+  transportCost Float    @default(0)
+  loadingCost   Float    @default(0)
+  otherCharges  Float    @default(0)
+  notes         String?
+  isCompleted   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  supplier Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  items    PurchaseItem[]
+  payments SupplierPayment[]
+
+  @@index([supplierId])
+  @@index([purchaseDate])
+}
+
+model PurchaseItem {
+  id            String @id @default(cuid())
+  purchaseId    String
+  productId     String
+  quantity      Float
+  rate          Float
+  gstPercentage Float  @default(5)
+  amount        Float
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@unique([purchaseId, productId])
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  invoiceNumber   String        @unique
+  customerId      String
+  invoiceDate     DateTime
+  dueDate         DateTime?
+  invoiceType     InvoiceType   @default(GST_INVOICE)
+  status          InvoiceStatus @default(DRAFT)
+  paymentType     PaymentType   @default(CASH)
+  gstEnabled      Boolean       @default(true)
+  subtotal        Float
+  discountAmount  Float         @default(0)
+  discountPercent Float         @default(0)
+  taxableAmount   Float
+  gstAmount       Float
+  totalAmount     Float
+  paidAmount      Float         @default(0)
+  notes           String?
+  createdById     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  customer  Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdBy User?             @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  items     InvoiceItem[]
+  payments  CustomerPayment[]
+
+  @@index([customerId])
+  @@index([invoiceDate])
+  @@index([status])
+}
+
+model InvoiceItem {
+  id              String @id @default(cuid())
+  invoiceId       String
+  productId       String
+  quantity        Float
+  rate            Float
+  discountPercent Float  @default(0)
+  discountAmount  Float  @default(0)
+  gstPercent      Float
+  amount          Float
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([invoiceId])
+  @@index([productId])
+}
+
+model StockMovement {
+  id            String            @id @default(cuid())
+  productId     String
+  movementType  StockMovementType
+  quantity      Float
+  quantityChange Float            @default(0)
+  balanceAfter  Float?
+  referenceId   String?
+  referenceType String?
+  reason        String?
+  lotNumber     String?
+  notes         String?
+  status        StockMovementStatus @default(POSTED)
+  approvedById  String?
+  approvedAt    DateTime?
+  createdAt     DateTime          @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([createdAt])
+  @@index([movementType])
+  @@index([status])
+  @@index([productId, lotNumber])
+}
+
+model Ledger {
+  id          String   @id @default(cuid())
+  customerId  String?
+  supplierId  String?
+  entryDate   DateTime
+  description String
+  debit       Float    @default(0)
+  credit      Float    @default(0)
+  balance     Float
+  ledgerType  String
+  createdAt   DateTime @default(now())
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([entryDate])
+  @@index([ledgerType])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  category    String
+  amount      Float
+  description String
+  expenseDate DateTime
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([expenseDate])
+  @@index([category])
+}
+
+model RateHistory {
+  id        String         @id @default(cuid())
+  productId String
+  market    MarketLocation
+  rate      Float
+  date      DateTime
+  notes     String?
+  createdAt DateTime       @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([date])
+  @@index([market])
+}
+
+model SupplierPayment {
+  id            String   @id @default(cuid())
+  purchaseId    String
+  supplierId    String
+  amount        Float
+  paymentDate   DateTime
+  paymentMethod String
+  reference     String?
+  idempotencyKey String? @unique
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([paymentDate])
+  @@index([purchaseId])
+  @@unique([purchaseId, reference])
+}
+
+model CustomerPayment {
+  id            String   @id @default(cuid())
+  invoiceId     String
+  customerId    String
+  amount        Float
+  paymentDate   DateTime
+  paymentMethod String
+  reference     String?
+  idempotencyKey String? @unique
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  invoice  Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([paymentDate])
+  @@index([invoiceId])
+  @@unique([invoiceId, reference])
+}
