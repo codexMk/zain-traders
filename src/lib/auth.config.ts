@@ -9,10 +9,16 @@ const credentialsSchema = z.object({
   password: z.string().min(1),
 });
 
-const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+const authSecret = (process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "").trim();
+
+if (!authSecret && process.env.NODE_ENV === "production") {
+  throw new Error(
+    "Missing AUTH_SECRET / NEXTAUTH_SECRET. Set a real production secret in the deployment environment and redeploy."
+  );
+}
 
 export const authConfig = {
-  secret: authSecret,
+  secret: authSecret || undefined,
   session: {
     strategy: "jwt",
   },
