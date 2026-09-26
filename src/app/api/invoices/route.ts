@@ -50,10 +50,10 @@ export async function GET(request: NextRequest) {
     const formatted = invoices.map((inv) => ({
       id: inv.id,
       invoiceNumber: inv.invoiceNumber,
-      customerName: inv.customer.name,
-      customerId: inv.customer.id,
-      total: inv.totalAmount,
-      paidAmount: inv.paidAmount,
+      customerName: inv.customer?.name ?? "Unknown customer",
+      customerId: inv.customer?.id ?? "",
+      total: Number(inv.totalAmount ?? 0),
+      paidAmount: Number(inv.paidAmount ?? 0),
       status: inv.status,
       paymentType: inv.paymentType,
       gstEnabled: inv.gstEnabled,
@@ -64,8 +64,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(formatted);
   } catch (error) {
-    console.error("GET /api/invoices failed", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("GET /api/invoices failed", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    return NextResponse.json({ error: "Failed to fetch invoices" }, { status: 500 });
   }
 }
 
@@ -210,6 +212,6 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create invoice" }, { status: 500 });
   }
 }

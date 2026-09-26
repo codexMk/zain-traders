@@ -1,6 +1,8 @@
 import { ImageResponse } from "next/og";
 import { businessInfo } from "@/lib/site-data";
 
+export const runtime = "edge";
+
 export const alt = `${businessInfo.displayName} premium wholesale spices and dry fruits`;
 export const size = {
   width: 1200,

@@ -10,24 +10,25 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const revenueStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
     const [
       todayInvoices,
       monthlyInvoices,
       totalCustomers,
       pendingPayments,
-      topProducts,
-      monthlyRevenue,
+      allInvoiceItems,
+      monthlyRevenueRows,
+      lowStock,
+      recentInvoices,
     ] = await Promise.all([
-      prisma.invoice.aggregate({
+      prisma.invoice.findMany({
         where: { invoiceDate: { gte: startOfDay }, status: { not: "DRAFT" } },
-        _sum: { totalAmount: true },
-        _count: true,
+        select: { totalAmount: true },
       }),
-      prisma.invoice.aggregate({
+      prisma.invoice.findMany({
         where: { invoiceDate: { gte: startOfMonth }, status: { not: "DRAFT" } },
-        _sum: { totalAmount: true },
-        _count: true,
+        select: { totalAmount: true },
       }),
       prisma.customer.count({ where: { isActive: true } }),
       prisma.invoice.count({
@@ -35,45 +36,76 @@ export async function GET(request: NextRequest) {
           status: { in: ["SENT", "PARTIALLY_PAID", "OVERDUE"] },
         },
       }),
-      prisma.invoiceItem.groupBy({
-        by: ["productId"],
-        _sum: { quantity: true, amount: true },
-        orderBy: { _sum: { amount: "desc" } },
-        take: 5,
+      prisma.invoiceItem.findMany({
+        select: { productId: true, quantity: true, amount: true },
       }),
-      prisma.invoice.groupBy({
-        by: ["invoiceDate"],
+      prisma.invoice.findMany({
         where: {
-          invoiceDate: {
-            gte: new Date(now.getFullYear(), now.getMonth() - 5, 1),
-          },
+          invoiceDate: { gte: revenueStart },
           status: { not: "DRAFT" },
         },
-        _sum: { totalAmount: true },
+        select: { invoiceDate: true, totalAmount: true },
+      }),
+      prisma.product
+        .findMany({
+          where: { isActive: true },
+          include: { category: true },
+        })
+        .then((products) =>
+          products.filter((p) => p.currentStock <= p.minimumStockLevel).slice(0, 10)
+        ),
+      prisma.invoice.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: { customer: { select: { name: true } } },
       }),
     ]);
 
-    const lowStock = await prisma.product.findMany({
-      where: { isActive: true },
-      include: { category: true },
-    }).then((products) =>
-      products.filter((p) => p.currentStock <= p.minimumStockLevel).slice(0, 10)
+    const todaySales = todayInvoices.reduce(
+      (sum, invoice) => sum + Number(invoice.totalAmount ?? 0),
+      0
+    );
+    const monthlySales = monthlyInvoices.reduce(
+      (sum, invoice) => sum + Number(invoice.totalAmount ?? 0),
+      0
     );
 
-    const productIds = topProducts.map((p) => p.productId);
+    const productTotals = new Map<
+      string,
+      { productId: string; quantity: number; value: number }
+    >();
+
+    allInvoiceItems.forEach((item) => {
+      const previous = productTotals.get(item.productId) ?? {
+        productId: item.productId,
+        quantity: 0,
+        value: 0,
+      };
+
+      productTotals.set(item.productId, {
+        productId: item.productId,
+        quantity: previous.quantity + Number(item.quantity ?? 0),
+        value: previous.value + Number(item.amount ?? 0),
+      });
+    });
+
+    const productIds = [...productTotals.keys()];
     const productDetails = await prisma.product.findMany({
       where: { id: { in: productIds } },
       select: { id: true, name: true, marathiName: true },
     });
 
-    const topSelling = topProducts.map((tp) => {
-      const product = productDetails.find((p) => p.id === tp.productId);
-      return {
-        name: product?.marathiName || product?.name || "Unknown",
-        value: tp._sum.amount ?? 0,
-        quantity: tp._sum.quantity ?? 0,
-      };
-    });
+    const topSelling = [...productTotals.values()]
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5)
+      .map((entry) => {
+        const product = productDetails.find((item) => item.id === entry.productId);
+        return {
+          name: product?.marathiName || product?.name || "Unknown",
+          value: entry.value,
+          quantity: entry.quantity,
+        };
+      });
 
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const revenueByMonth: Record<string, number> = {};
@@ -84,25 +116,19 @@ export async function GET(request: NextRequest) {
       revenueByMonth[key] = 0;
     }
 
-    monthlyRevenue.forEach((row) => {
+    monthlyRevenueRows.forEach((row) => {
       const d = new Date(row.invoiceDate);
       const key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
       if (key in revenueByMonth) {
-        revenueByMonth[key] += row._sum.totalAmount ?? 0;
+        revenueByMonth[key] += Number(row.totalAmount ?? 0);
       }
     });
 
-    const recentInvoices = await prisma.invoice.findMany({
-      take: 5,
-      orderBy: { createdAt: "desc" },
-      include: { customer: { select: { name: true } } },
-    });
-
     return NextResponse.json({
-      todaySales: todayInvoices._sum.totalAmount ?? 0,
-      todayInvoiceCount: todayInvoices._count,
-      monthlySales: monthlyInvoices._sum.totalAmount ?? 0,
-      monthlyInvoiceCount: monthlyInvoices._count,
+      todaySales,
+      todayInvoiceCount: todayInvoices.length,
+      monthlySales,
+      monthlyInvoiceCount: monthlyInvoices.length,
       totalCustomers,
       lowStockCount: lowStock.length,
       lowStockProducts: lowStock.map((p) => ({
@@ -121,13 +147,14 @@ export async function GET(request: NextRequest) {
       recentActivity: recentInvoices.map((inv) => ({
         id: inv.id,
         title: `Invoice ${inv.invoiceNumber}`,
-        customer: inv.customer.name,
-        amount: inv.totalAmount,
+        customer: inv.customer?.name ?? "Unknown customer",
+        amount: Number(inv.totalAmount ?? 0),
         date: inv.createdAt,
         status: inv.status,
       })),
     });
-  } catch {
+  } catch (error) {
+    console.error("GET /api/dashboard/stats failed", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

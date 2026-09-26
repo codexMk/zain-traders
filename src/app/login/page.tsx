@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +33,8 @@ export default function LoginPage() {
       }
 
       if (result?.ok) {
-        router.push("/dashboard");
+        const safeCallback = callbackUrl.startsWith("/") ? callbackUrl : "/dashboard";
+        router.push(safeCallback);
         router.refresh();
       }
     } catch {
@@ -122,5 +126,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-emerald-50 to-emerald-100" />}>
+      <LoginForm />
+    </Suspense>
   );
 }

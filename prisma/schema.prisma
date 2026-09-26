@@ -64,15 +64,16 @@ enum MarketLocation {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String?
-  name      String
-  phone     String?
-  role      UserRole @default(STAFF)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String?
+  name          String
+  phone         String?
+  role          UserRole @default(STAFF)
+  isActive      Boolean  @default(true)
+  sessionVersion Int     @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   invoicesCreated Invoice[] @relation("InvoiceCreatedBy")
 

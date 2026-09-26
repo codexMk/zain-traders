@@ -9,8 +9,10 @@ const credentialsSchema = z.object({
   password: z.string().min(1),
 });
 
+const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+
 export const authConfig = {
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  secret: authSecret,
   session: {
     strategy: "jwt",
   },
@@ -29,22 +31,14 @@ export const authConfig = {
 
         try {
           const { email, password } = credentialsSchema.parse(credentials);
+          const user = await prisma.user.findUnique({ where: { email } });
 
-          const user = await prisma.user.findUnique({
-            where: { email },
-          });
-
-          if (!user || !user.password) {
+          if (!user || !user.password || !user.isActive) {
             return null;
           }
 
           const passwordMatch = await compare(password, user.password);
-
           if (!passwordMatch) {
-            return null;
-          }
-
-          if (!user.isActive) {
             return null;
           }
 
@@ -62,19 +56,34 @@ export const authConfig = {
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user) {
-        token.role = user.role;
-        if (user.id) {
-          token.id = user.id;
-        }
+      const userId = typeof user?.id === "string" ? user.id : token.id;
+
+      if (userId) {
+        token.id = userId;
       }
+
+      if (token.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: String(token.id) },
+          select: { role: true, isActive: true },
+        });
+
+        if (!dbUser || !dbUser.isActive) {
+          return { ...token, invalid: true };
+        }
+
+        token.role = dbUser.role as "OWNER" | "STAFF" | "ACCOUNTANT";
+      }
+
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.role = token.role as "OWNER" | "STAFF" | "ACCOUNTANT";
-        session.user.id = token.id as string;
+      if (!session.user) {
+        return session;
       }
+
+      session.user.id = String(token.id ?? session.user.id ?? "");
+      session.user.role = (token.role as "OWNER" | "STAFF" | "ACCOUNTANT") ?? "STAFF";
       return session;
     },
   },
