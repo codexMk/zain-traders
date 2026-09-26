@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
   Menu,
@@ -24,7 +24,6 @@ import { DashboardProviders } from "@/components/providers/session-provider";
 function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
-  const router = useRouter();
   const { data: session } = useSession();
 
   const menuItems = [
@@ -43,8 +42,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     pathname === href || pathname.startsWith(href + "/");
 
   const handleLogout = async () => {
-    await signOut({ redirect: false });
-    router.push("/login");
+    await signOut({ callbackUrl: "/login", redirect: true });
   };
 
   return (

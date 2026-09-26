@@ -4,13 +4,18 @@ import type { Session } from "next-auth";
 
 export async function authenticate(request: NextRequest) {
   void request;
-  const session = await auth();
 
-  if (!session?.user) {
+  try {
+    const session = await auth();
+
+    if (!session?.user) {
+      return null;
+    }
+
+    return session;
+  } catch {
     return null;
   }
-
-  return session;
 }
 
 export async function requireAuth(
