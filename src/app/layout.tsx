@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { LenisProvider } from "@/components/providers/lenis-provider";
+import { DashboardProviders } from "@/components/providers/session-provider";
 import { businessInfo, seoDescription, seoKeywords, siteUrl } from "@/lib/site-data";
 import "./globals.css";
 
@@ -79,7 +80,9 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${playfairDisplay.variable} bg-background font-sans text-foreground antialiased`}
       >
-        <LenisProvider>{children}</LenisProvider>
+        <DashboardProviders>
+          <LenisProvider>{children}</LenisProvider>
+        </DashboardProviders>
       </body>
     </html>
   );
