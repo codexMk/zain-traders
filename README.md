@@ -201,6 +201,7 @@ src/
 ```env
 # Database
 DATABASE_URL="postgresql://postgres:postgres123@localhost:5434/zain_traders_erp"
+DIRECT_URL="postgresql://postgres:postgres123@localhost:5434/zain_traders_erp"
 
 # NextAuth
 NEXTAUTH_SECRET="your-secret-key"
@@ -209,6 +210,23 @@ NEXTAUTH_URL="http://localhost:3000"
 # API
 NEXT_PUBLIC_API_URL="http://localhost:3000/api"
 ```
+
+## Neon + Vercel Setup
+
+1. Create a Neon Postgres database and copy the connection strings.
+2. In Vercel Project > Settings > Environment Variables, add:
+   - `DATABASE_URL` = Neon pooled connection string
+   - `DIRECT_URL` = Neon direct/non-pooled connection string
+   - `NEXTAUTH_URL` = your production domain
+   - `NEXTAUTH_SECRET` = a strong secret
+3. If your project uses Vercel's automatic Postgres integration, map the generated values to the same Prisma names above.
+4. After deployment, run:
+
+```bash
+npx prisma db push
+```
+
+This keeps Prisma compatible with Neon while allowing safe database migrations in a serverless Vercel deployment.
 
 ## Available Scripts
 
