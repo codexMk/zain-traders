@@ -219,6 +219,7 @@ model Invoice {
   gstAmount       Float
   totalAmount     Float
   paidAmount      Float         @default(0)
+  deliveryBy      String?
   notes           String?
   createdById     String?
   createdAt       DateTime      @default(now())

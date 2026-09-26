@@ -155,6 +155,7 @@ export async function POST(
         gstAmount,
         totalAmount,
         status: "DRAFT",
+        deliveryBy: original.deliveryBy,
         notes: original.notes,
         createdById: session.user.id,
         items: {

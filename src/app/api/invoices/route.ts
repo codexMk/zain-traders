@@ -16,6 +16,7 @@ const createInvoiceSchema = z.object({
   gstEnabled: z.boolean().default(true),
   discountAmount: z.number().default(0),
   discountPercent: z.number().default(0),
+  deliveryBy: z.string().max(200).optional().or(z.literal("")),
   notes: z.string().optional(),
   status: z.enum(["DRAFT", "SENT", "PAID"]).default("SENT"),
   items: z
@@ -117,6 +118,7 @@ export async function POST(request: NextRequest) {
           paidAmount: data.paymentType === "CREDIT" ? 0 : totalAmount,
           status:
             data.paymentType === "CREDIT" ? "SENT" : data.status === "DRAFT" ? "DRAFT" : "PAID",
+          deliveryBy: data.deliveryBy?.trim() || null,
           notes: data.notes,
           createdById: userId,
           items: {

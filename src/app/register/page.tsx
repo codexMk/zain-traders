@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -15,6 +17,17 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
   });
+
+  useEffect(() => {
+    if (status === "loading") return;
+    if (!session) {
+      router.replace("/login");
+      return;
+    }
+    if (session.user.role !== "OWNER") {
+      router.replace("/dashboard");
+    }
+  }, [session, status, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -66,6 +79,20 @@ export default function RegisterPage() {
       setIsLoading(false);
     }
   };
+
+  if (status === "loading" || !session || session.user.role !== "OWNER") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-xl bg-white p-8 text-center shadow-2xl">
+          <h1 className="mb-3 text-2xl font-bold text-emerald-900">Owner access only</h1>
+          <p className="mb-6 text-sm text-gray-600">Only the business owner can create new user accounts.</p>
+          <Link href="/login" className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+            Back to login
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center p-4">

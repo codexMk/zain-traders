@@ -48,9 +48,9 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex h-screen bg-brand-cream">
+    <div className="dashboard-shell flex h-screen bg-brand-cream">
       <div
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-brand-emerald text-white transform transition-transform duration-300 lg:static lg:translate-x-0 ${
+        className={`dashboard-sidebar fixed inset-y-0 left-0 z-40 w-64 bg-brand-emerald text-white transform transition-transform duration-300 lg:static lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -108,8 +108,8 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 bg-black/50 lg:hidden z-30" onClick={() => setMobileOpen(false)} />
       )}
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="min-h-[64px] bg-white border-b px-4 py-3 shadow-sm md:px-6">
+      <div className="dashboard-main flex-1 flex flex-col overflow-hidden">
+        <div className="dashboard-header min-h-[64px] bg-white border-b px-4 py-3 shadow-sm md:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <button onClick={() => setMobileOpen(!mobileOpen)} className="lg:hidden text-brand-charcoal">
               {mobileOpen ? <X size={24} /> : <Menu size={24} />}
@@ -131,7 +131,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
         </div>
-        <div className="flex-1 overflow-auto">
+        <div className="dashboard-content flex-1 overflow-auto">
           <div className="p-4 md:p-6">{children}</div>
         </div>
       </div>

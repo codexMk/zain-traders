@@ -12,6 +12,7 @@ export interface InvoicePdfData {
   paymentType: string;
   gstEnabled: boolean;
   invoiceType: string;
+  deliveryBy?: string | null;
   items: {
     name: string;
     marathiName?: string | null;
@@ -138,6 +139,10 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   y += 6;
   doc.text(`Payment: ${data.paymentType}`, margin, y);
   doc.text(`Type: ${data.invoiceType.replace("_", " ")}`, pageWidth - margin, y, { align: "right" });
+  if (data.deliveryBy) {
+    y += 6;
+    doc.text(`Delivery By: ${data.deliveryBy}`, margin, y);
+  }
 
   y += 12;
   doc.setFillColor(248, 244, 233);

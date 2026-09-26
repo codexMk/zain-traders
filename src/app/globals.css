@@ -111,6 +111,59 @@ img {
   background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.82), transparent);
 }
 
+@media print {
+  @page {
+    margin: 0;
+    size: A4;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    margin: 0 !important;
+  }
+
+  .dashboard-sidebar,
+  .dashboard-header,
+  .dashboard-content > div:first-child > .flex-wrap.items-center.justify-between.gap-4.mb-6,
+  .dashboard-content > div:first-child > .flex-wrap.items-center.justify-between.gap-4.mb-6 ~ * {
+    display: none !important;
+  }
+
+  .dashboard-shell,
+  .dashboard-main,
+  .dashboard-content {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+  }
+
+  .dashboard-content {
+    padding: 0 !important;
+  }
+
+  #invoice-print {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+  }
+
+  #invoice-print * {
+    color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

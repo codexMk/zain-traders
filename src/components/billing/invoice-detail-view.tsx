@@ -30,6 +30,7 @@ interface InvoiceDetail {
   taxableAmount: number;
   gstAmount: number;
   totalAmount: number;
+  deliveryBy?: string | null;
   notes?: string | null;
   customer: {
     name: string;
@@ -99,6 +100,7 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
       taxableAmount: invoice.taxableAmount,
       gstAmount: invoice.gstAmount,
       totalAmount: invoice.totalAmount,
+      deliveryBy: invoice.deliveryBy,
       notes: invoice.notes,
     };
   };
@@ -204,6 +206,9 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
                 Date: {new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}
               </p>
               <p className="text-sm">Payment: {invoice.paymentType}</p>
+              {invoice.deliveryBy && (
+                <p className="text-sm mt-1">Delivery By: {invoice.deliveryBy}</p>
+              )}
             </div>
           </div>
 
