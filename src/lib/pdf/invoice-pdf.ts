@@ -46,18 +46,25 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
     doc.setFillColor(15, 61, 46);
     doc.rect(0, 0, pageWidth, 42, "F");
 
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(14, 7, 18, 18, 3, 3, "F");
+    doc.setTextColor(15, 61, 46);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("ZT", 23, 19, { align: "center" });
+
     doc.setTextColor(212, 175, 55);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(20);
-    doc.text(businessInfo.name, pageWidth / 2, 15, { align: "center" });
+    doc.setFontSize(18);
+    doc.text(businessInfo.nameEnglish || businessInfo.name, pageWidth / 2 + 6, 15, { align: "center" });
 
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(businessInfo.tagline, pageWidth / 2, 22, { align: "center" });
-    doc.setFontSize(7.5);
-    doc.text(`Address: ${businessInfo.address}`, pageWidth / 2, 28, { align: "center" });
-    doc.text(`Phone: ${businessInfo.phones.join(" | ")}`, pageWidth / 2, 33, { align: "center" });
+    doc.setFontSize(8.5);
+    doc.text(businessInfo.tagline, pageWidth / 2 + 6, 22, { align: "center" });
+    doc.setFontSize(7.2);
+    doc.text(`Address: ${businessInfo.address}`, pageWidth / 2 + 6, 28, { align: "center" });
+    doc.text(`Phone: ${businessInfo.phones.join(" | ")}`, pageWidth / 2 + 6, 33, { align: "center" });
   };
 
   const drawProductHeader = (tableTop: number) => {
@@ -200,6 +207,11 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
     doc.setTextColor(88, 88, 88);
     doc.text(noteLines, margin, pageHeight - 18);
   }
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 61, 46);
+  doc.setFontSize(8.5);
+  doc.text("Thank you for your business.", pageWidth / 2, pageHeight - 25, { align: "center" });
 
   doc.setFont("helvetica", "normal");
   doc.setTextColor(100, 100, 100);
