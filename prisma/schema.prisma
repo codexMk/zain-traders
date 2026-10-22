@@ -41,6 +41,7 @@ enum InvoiceStatus {
   PAID
   PARTIALLY_PAID
   OVERDUE
+  CANCELLED
 }
 
 enum MarketLocation {
@@ -198,6 +199,8 @@ model Invoice {
   dueDate           DateTime?
   invoiceType       InvoiceType @default(GST_INVOICE)
   status            InvoiceStatus @default(DRAFT)
+  customerName      String      @default("")
+  customerMobile    String?
 
   subtotal          Float
   discountAmount    Float     @default(0)
@@ -343,6 +346,7 @@ model CustomerPayment {
   paymentMethod   String    // CASH, CHEQUE, BANK, DIGITAL
   reference       String?
   notes           String?
+  reversedAt      DateTime?
 
   createdAt       DateTime  @default(now())
 

@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       prisma.invoice.findMany({
         where: {
           invoiceDate: { gte: monthStart, lt: nextMonth },
-          status: { notIn: ["DRAFT", "CANCELLED"] },
+          status: { not: "DRAFT" },
         },
         select: {
           totalAmount: true,
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
         },
       }),
       prisma.invoice.findMany({
-        where: { status: { notIn: ["DRAFT", "CANCELLED"] } },
+        where: { status: { not: "DRAFT" } },
         select: { totalAmount: true, paidAmount: true },
       }),
       prisma.purchase.aggregate({
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
         },
       }),
       prisma.invoice.findMany({
-        where: { status: { notIn: ["DRAFT", "CANCELLED"] } },
+        where: { status: { not: "DRAFT" } },
         select: {
           id: true,
           invoiceNumber: true,
@@ -76,8 +76,7 @@ export async function GET(request: NextRequest) {
           paidAmount: true,
           status: true,
           customerId: true,
-          customerName: true,
-          customerMobile: true,
+          customer: { select: { name: true, mobile: true } },
         },
         orderBy: { invoiceDate: "desc" },
       }),
@@ -100,7 +99,7 @@ export async function GET(request: NextRequest) {
           orderBy: { name: "asc" },
       }),
       prisma.customerPayment.findMany({
-        where: { paymentDate: { gte: monthStart, lt: nextMonth }, reversedAt: null, invoice: { status: { notIn: ["DRAFT", "CANCELLED"] } } },
+        where: { paymentDate: { gte: monthStart, lt: nextMonth }, reversedAt: null, invoice: { status: { not: "DRAFT" } } },
         select: { amount: true, paymentMethod: true },
       }),
     ]);
@@ -157,8 +156,8 @@ export async function GET(request: NextRequest) {
         id: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
         customerId: invoice.customerId,
-        customerName: invoice.customerName || "Walk-in Customer",
-        customerMobile: invoice.customerMobile || "",
+        customerName: invoice.customer?.name || "Walk-in Customer",
+        customerMobile: invoice.customer?.mobile || "",
         invoiceDate: invoice.invoiceDate,
         dueDate: invoice.dueDate,
         totalAmount: invoice.totalAmount,
