@@ -1,6 +1,7 @@
 import { requireAuth } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { indiaDateKey, indiaStartOfDay, isValidDateOnly } from "@/lib/date-utils";
+import type { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
     const from = indiaStartOfDay(fromKey);
     const endExclusive = indiaStartOfDay(toKey).getTime() + 24 * 60 * 60 * 1000;
     const end = new Date(endExclusive);
-    const finalized = { status: { notIn: ["DRAFT", "CANCELLED"] as const } };
+    const finalized: Prisma.InvoiceWhereInput = { status: { notIn: ["DRAFT", "CANCELLED"] } };
 
     const [sales, expenses, allInvoices, receipts, allPurchases, allSupplierPayments, ledger] = await Promise.all([
       prisma.invoice.findMany({ where: { ...finalized, invoiceDate: { gte: from, lt: end } }, select: { totalAmount: true, paidAmount: true, gstAmount: true, invoiceNumber: true, customerName: true, invoiceDate: true } }),
