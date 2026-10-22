@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
         },
         select: {
           productId: true,
+          productName: true,
           amount: true,
           product: { select: { name: true } },
         },
@@ -96,11 +97,12 @@ export async function GET(request: NextRequest) {
 
     const productSales = new Map<string, { name: string; value: number }>();
     for (const item of productItems) {
-      const previous = productSales.get(item.productId) ?? {
-        name: item.product.name,
+      const key = item.productId ?? `one-time:${item.productName}`;
+      const previous = productSales.get(key) ?? {
+        name: item.product?.name ?? item.productName ?? "Item",
         value: 0,
       };
-      productSales.set(item.productId, {
+      productSales.set(key, {
         ...previous,
         value: previous.value + item.amount,
       });

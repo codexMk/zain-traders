@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       invoices.map((invoice) => ({
         id: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
-        customerName: invoice.customer.name,
+        customerName: invoice.customer?.name ?? invoice.customerName,
         total: invoice.totalAmount,
         status: invoice.status,
         createdAt: invoice.createdAt,

@@ -43,6 +43,18 @@ async function main() {
   });
   console.log("✅ Accountant created:", accountant.email);
 
+  const categories = await Promise.all([
+    { name: "Whole Spices", slug: "whole-spices" },
+    { name: "Powder Spices", slug: "powder-spices" },
+    { name: "Dry Fruits", slug: "dry-fruits" },
+    { name: "Other Products", slug: "other-products" },
+  ].map(({ name, slug }) => prisma.category.upsert({
+    where: { slug },
+    update: { name },
+    create: { name, slug },
+  })));
+  const wholeSpices = categories[0];
+
   // Create Sample Products
   const products = await Promise.all([
     prisma.product.create({
@@ -50,7 +62,7 @@ async function main() {
         name: "Jeera",
         marathiName: "जिरा",
         sku: "JEERA-001",
-        category: "WHOLE_SPICES",
+        categoryId: wholeSpices.id,
         unit: "KG",
         hsnCode: "0908.10",
         gstPercentage: 5,
@@ -65,7 +77,7 @@ async function main() {
         name: "Dhana",
         marathiName: "धना",
         sku: "DHANA-001",
-        category: "WHOLE_SPICES",
+        categoryId: wholeSpices.id,
         unit: "KG",
         hsnCode: "0909.10",
         gstPercentage: 5,
@@ -80,7 +92,7 @@ async function main() {
         name: "Kali Miri",
         marathiName: "काळी मिरी",
         sku: "KALI-MIRI-001",
-        category: "WHOLE_SPICES",
+        categoryId: wholeSpices.id,
         unit: "KG",
         hsnCode: "0904.20",
         gstPercentage: 5,
@@ -95,7 +107,7 @@ async function main() {
         name: "Elaichi",
         marathiName: "एलाईची",
         sku: "ELAICHI-001",
-        category: "WHOLE_SPICES",
+        categoryId: wholeSpices.id,
         unit: "KG",
         hsnCode: "0908.30",
         gstPercentage: 5,

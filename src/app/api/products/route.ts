@@ -7,12 +7,7 @@ const createProductSchema = z.object({
   name: z.string().min(1),
   marathiName: z.string().optional(),
   sku: z.string().min(1),
-  category: z.enum([
-    "WHOLE_SPICES",
-    "POWDER_SPICES",
-    "DRY_FRUITS",
-    "OTHER_PRODUCTS",
-  ]),
+  categoryId: z.string().min(1),
   unit: z.enum(["KG", "GRAM", "BAG", "PIECE"]),
   hsnCode: z.string().optional(),
   gstPercentage: z.number().default(5),
@@ -28,10 +23,15 @@ export async function GET(request: NextRequest) {
 
     const products = await prisma.product.findMany({
       where: { isActive: true },
+      include: { category: true },
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json(products);
+    return NextResponse.json(products.map(({ category, ...product }) => ({
+      ...product,
+      category: category.name,
+      categoryId: category.id,
+    })));
   } catch (error) {
     return NextResponse.json(
       { error: "Internal server error" },
@@ -53,9 +53,14 @@ export async function POST(request: NextRequest) {
         ...data,
         currentStock: 0,
       },
+      include: { category: true },
     });
 
-    return NextResponse.json(product, { status: 201 });
+    return NextResponse.json({
+      ...product,
+      category: product.category.name,
+      categoryId: product.category.id,
+    }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

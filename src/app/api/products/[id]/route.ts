@@ -6,9 +6,7 @@ import { z } from "zod";
 const updateProductSchema = z.object({
   name: z.string().optional(),
   marathiName: z.string().optional(),
-  category: z
-    .enum(["WHOLE_SPICES", "POWDER_SPICES", "DRY_FRUITS", "OTHER_PRODUCTS"])
-    .optional(),
+  categoryId: z.string().optional(),
   unit: z.enum(["KG", "GRAM", "BAG", "PIECE"]).optional(),
   hsnCode: z.string().optional(),
   gstPercentage: z.number().optional(),
@@ -29,6 +27,7 @@ export async function GET(
     const product = await prisma.product.findUnique({
       where: { id },
       include: {
+        category: true,
         stockMovements: {
           orderBy: { createdAt: "desc" },
           take: 20,
@@ -44,7 +43,8 @@ export async function GET(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    return NextResponse.json(product);
+    const { category, ...productData } = product;
+    return NextResponse.json({ ...productData, category: category.name, categoryId: category.id });
   } catch (error) {
     return NextResponse.json(
       { error: "Internal server error" },
@@ -68,9 +68,11 @@ export async function PUT(
     const product = await prisma.product.update({
       where: { id },
       data,
+      include: { category: true },
     });
 
-    return NextResponse.json(product);
+    const { category, ...productData } = product;
+    return NextResponse.json({ ...productData, category: category.name, categoryId: category.id });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
