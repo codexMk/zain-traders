@@ -30,17 +30,7 @@ export async function GET(
       include: {
         purchases: {
           orderBy: { purchaseDate: "desc" },
-          take: 50,
-          include: {
-            payments: { orderBy: { paymentDate: "desc" } },
-          },
-        },
-        paymentHistory: {
-          orderBy: { paymentDate: "desc" },
-          take: 50,
-          include: {
-            purchase: { select: { invoiceNumber: true, totalAmount: true } },
-          },
+          take: 10,
         },
       },
     });
@@ -53,7 +43,7 @@ export async function GET(
     }
 
     return NextResponse.json(supplier);
-  } catch {
+  } catch (error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -109,7 +99,7 @@ export async function DELETE(
     });
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

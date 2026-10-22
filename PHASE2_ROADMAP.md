@@ -9,7 +9,7 @@ Phase 1 foundation is complete! This document outlines the next steps for buildi
 # 1. Install dependencies
 npm install
 
-# 2. Start PostgreSQL  
+# 2. Start PostgreSQL
 docker-compose up -d
 
 # 3. Setup database

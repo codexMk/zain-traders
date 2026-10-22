@@ -1,35 +1,24 @@
 import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
-import type { Session } from "next-auth";
-
-export async function getCurrentUser() {
-  const session = await auth();
-  return session?.user ? session : null;
-}
 
 export async function authenticate(request: NextRequest) {
-  void request;
+  const session = await auth();
 
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      return null;
-    }
-
-    return session;
-  } catch {
+  if (!session?.user) {
     return null;
   }
+
+  return session;
 }
 
-export async function requireAuth(
-  request: NextRequest
-): Promise<Session | NextResponse> {
+export async function requireAuth(request: NextRequest) {
   const session = await authenticate(request);
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
   }
 
   return session;
@@ -38,7 +27,7 @@ export async function requireAuth(
 export async function requireRole(
   request: NextRequest,
   allowedRoles: string[]
-): Promise<Session | NextResponse> {
+) {
   const session = await requireAuth(request);
 
   if (session instanceof NextResponse) {
@@ -46,17 +35,10 @@ export async function requireRole(
   }
 
   if (!allowedRoles.includes(session.user.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  return session;
-}
-
-export async function requirePageAuth() {
-  const session = await auth();
-
-  if (!session?.user) {
-    redirect("/login");
+    return NextResponse.json(
+      { error: "Forbidden" },
+      { status: 403 }
+    );
   }
 
   return session;

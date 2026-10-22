@@ -1,15 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, AlertCircle, CheckCircle } from "lucide-react";
-
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-}
 
 interface ProductFormProps {
   initialData?: {
@@ -17,8 +11,7 @@ interface ProductFormProps {
     name: string;
     marathiName?: string;
     sku: string;
-    categoryId?: string;
-    category?: { id: string; name: string };
+    category: string;
     unit: string;
     hsnCode?: string;
     gstPercentage: number;
@@ -28,6 +21,13 @@ interface ProductFormProps {
   };
   isEditing?: boolean;
 }
+
+const CATEGORIES = [
+  { value: "WHOLE_SPICES", label: "Whole Spices" },
+  { value: "POWDER_SPICES", label: "Powder Spices" },
+  { value: "DRY_FRUITS", label: "Dry Fruits" },
+  { value: "OTHER_PRODUCTS", label: "Other Products" },
+];
 
 const UNITS = [
   { value: "KG", label: "Kilogram (KG)" },
@@ -41,13 +41,12 @@ export default function ProductForm({ initialData, isEditing }: ProductFormProps
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
 
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
     marathiName: initialData?.marathiName || "",
     sku: initialData?.sku || "",
-    categoryId: initialData?.categoryId || initialData?.category?.id || "",
+    category: initialData?.category || "WHOLE_SPICES",
     unit: initialData?.unit || "KG",
     hsnCode: initialData?.hsnCode || "",
     gstPercentage: initialData?.gstPercentage || 5,
@@ -55,18 +54,6 @@ export default function ProductForm({ initialData, isEditing }: ProductFormProps
     sellingRate: initialData?.sellingRate || 0,
     minimumStockLevel: initialData?.minimumStockLevel || 0,
   });
-
-  useEffect(() => {
-    fetch("/api/categories")
-      .then((r) => r.json())
-      .then((data: Category[]) => {
-        setCategories(data);
-        if (!formData.categoryId && data.length > 0) {
-          setFormData((prev) => ({ ...prev, categoryId: data[0].id }));
-        }
-      })
-      .catch(console.error);
-  }, [formData.categoryId]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -128,7 +115,7 @@ export default function ProductForm({ initialData, isEditing }: ProductFormProps
       setTimeout(() => {
         router.push("/dashboard/products");
       }, 1500);
-    } catch {
+    } catch (err) {
       setError("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
@@ -249,17 +236,15 @@ export default function ProductForm({ initialData, isEditing }: ProductFormProps
                 Category *
               </label>
               <select
-                name="categoryId"
-                value={formData.categoryId}
+                name="category"
+                value={formData.category}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                 disabled={isLoading}
-                required
               >
-                <option value="">Select Category</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
+                {CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
                   </option>
                 ))}
               </select>

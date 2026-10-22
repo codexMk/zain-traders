@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Users, Plus, Search, Edit, Trash2, Eye } from "lucide-react";
+import { Users, Plus, Search, Edit, Trash2 } from "lucide-react";
 
 interface Customer {
   id: string;
@@ -28,8 +28,8 @@ export default function CustomersPage() {
       const response = await fetch("/api/customers");
       const data = await response.json();
       setCustomers(data);
-    } catch {
-      console.error("Failed to fetch customers");
+    } catch (error) {
+      console.error("Failed to fetch customers:", error);
     } finally {
       setIsLoading(false);
     }
@@ -49,8 +49,8 @@ export default function CustomersPage() {
       } else {
         alert("Failed to delete customer");
       }
-    } catch {
-      console.error("Delete error");
+    } catch (error) {
+      console.error("Delete error:", error);
       alert("Error deleting customer");
     } finally {
       setIsDeleting(false);
@@ -128,13 +128,6 @@ export default function CustomersPage() {
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex gap-2">
-                        <Link
-                          href={`/dashboard/customers/${customer.id}`}
-                          className="text-emerald-600 hover:text-emerald-800"
-                          title="View customer"
-                        >
-                          <Eye size={18} />
-                        </Link>
                         <Link
                           href={`/dashboard/customers/${customer.id}/edit`}
                           className="text-blue-600 hover:text-blue-800"

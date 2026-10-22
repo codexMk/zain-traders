@@ -9,7 +9,7 @@ interface Product {
   name: string;
   marathiName?: string;
   sku: string;
-  category: { name: string };
+  category: string;
   currentStock: number;
   sellingRate: number;
   minimumStockLevel: number;
@@ -128,7 +128,7 @@ export default function ProductsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{product.sku}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{product.category?.name ?? "-"}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{product.category}</td>
                     <td className="px-6 py-4">
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-semibold ${

@@ -1,19 +1,16 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 
-function LoginForm() {
+export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,11 +30,10 @@ function LoginForm() {
       }
 
       if (result?.ok) {
-        const safeCallback = callbackUrl.startsWith("/") ? callbackUrl : "/dashboard";
-        router.push(safeCallback);
+        router.push("/dashboard");
         router.refresh();
       }
-    } catch {
+    } catch (err) {
       setError("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
@@ -107,32 +103,22 @@ function LoginForm() {
           </form>
 
           {/* Footer */}
-          <div className="mt-6 space-y-3 text-center">
-            <p className="text-sm text-gray-600">Only the owner can create new user accounts.</p>
-            <Link
-              href="/"
-              className="inline-flex w-full items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50"
-            >
-              ← Back to Home
-            </Link>
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Don&apos;t have an account?{" "}
+              <Link href="/register" className="text-emerald-600 hover:text-emerald-700 font-medium">
+                Register here
+              </Link>
+            </p>
           </div>
         </div>
 
         {/* Branding Footer */}
         <div className="mt-8 text-center text-emerald-700 text-sm">
-          <p>Head Office: Mallik Nagar, Kondhwa, Pune 411048</p>
-          <p>Branch Office: Bus Stand, Paranda, Dharashiv 413502</p>
-          <p>Ph: 9307427731 | 9021276946</p>
+          <p>Kurduwadi Road, Paranda</p>
+          <p>Ph: 9307427731 | 8856915606</p>
         </div>
       </div>
     </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-emerald-50 to-emerald-100" />}>
-      <LoginForm />
-    </Suspense>
   );
 }

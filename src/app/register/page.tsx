@@ -1,15 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const sessionState = useSession();
-  const session = sessionState?.data;
-  const status = sessionState?.status ?? "loading";
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -19,17 +15,6 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
   });
-
-  useEffect(() => {
-    if (status === "loading") return;
-    if (!session) {
-      router.replace("/login");
-      return;
-    }
-    if (session.user.role !== "OWNER") {
-      router.replace("/dashboard");
-    }
-  }, [session, status, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -75,26 +60,12 @@ export default function RegisterPage() {
 
       // Success - redirect to login
       router.push("/login?registered=true");
-    } catch {
+    } catch (err) {
       setError("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
-
-  if (status === "loading" || !session || session.user.role !== "OWNER") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-md rounded-xl bg-white p-8 text-center shadow-2xl">
-          <h1 className="mb-3 text-2xl font-bold text-emerald-900">Owner access only</h1>
-          <p className="mb-6 text-sm text-gray-600">Only the business owner can create new user accounts.</p>
-          <Link href="/login" className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-            Back to login
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center p-4">
@@ -224,9 +195,8 @@ export default function RegisterPage() {
 
         {/* Branding Footer */}
         <div className="mt-8 text-center text-emerald-700 text-sm">
-          <p>Head Office: Mallik Nagar, Kondhwa, Pune 411048</p>
-          <p>Branch Office: Bus Stand, Paranda, Dharashiv 413502</p>
-          <p>Ph: 9307427731 | 9021276946</p>
+          <p>Kurduwadi Road, Paranda</p>
+          <p>Ph: 9307427731 | 8856915606</p>
         </div>
       </div>
     </div>

@@ -9,11 +9,8 @@ interface Purchase {
   purchaseNumber: string;
   supplierName: string;
   total: number;
-  createdAt: string;
   status: string;
-  approvalStatus?: string;
-  paymentStatus?: string;
-  paidAmount?: number;
+  createdAt: string;
 }
 
 export default function PurchasesPage() {
@@ -29,7 +26,7 @@ export default function PurchasesPage() {
   const fetchPurchases = async () => {
     try {
       const response = await fetch("/api/purchases");
-      const data = (await response.json()) as Purchase[];
+      const data = await response.json();
       setPurchases(data);
     } catch (error) {
       console.error("Failed to fetch purchases:", error);
@@ -39,9 +36,7 @@ export default function PurchasesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this purchase order?")) {
-      return;
-    }
+    if (!confirm("Are you sure you want to delete this purchase order?")) return;
 
     setIsDeleting(true);
     try {
@@ -50,7 +45,7 @@ export default function PurchasesPage() {
       });
 
       if (response.ok) {
-        setPurchases((current) => current.filter((purchase) => purchase.id !== id));
+        setPurchases(purchases.filter((p) => p.id !== id));
       } else {
         alert("Failed to delete purchase order");
       }
@@ -68,26 +63,16 @@ export default function PurchasesPage() {
       purchase.supplierName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getApprovalColor = (status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case "APPROVED":
       case "COMPLETED":
         return "bg-green-100 text-green-800";
       case "PENDING":
         return "bg-yellow-100 text-yellow-800";
+      case "DRAFT":
+        return "bg-gray-100 text-gray-800";
       default:
         return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getPaymentColor = (status?: string) => {
-    switch (status) {
-      case "PAID":
-        return "bg-emerald-100 text-emerald-800";
-      case "PARTIALLY_PAID":
-        return "bg-amber-100 text-amber-800";
-      default:
-        return "bg-sky-100 text-sky-800";
     }
   };
 
@@ -135,8 +120,7 @@ export default function PurchasesPage() {
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Supplier</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Amount</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Date</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Receipt</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Payment</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Actions</th>
                 </tr>
               </thead>
@@ -150,21 +134,15 @@ export default function PurchasesPage() {
                       {new Date(purchase.createdAt).toLocaleDateString("en-IN")}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getApprovalColor(purchase.approvalStatus ?? purchase.status)}`}>
-                        {purchase.approvalStatus ?? purchase.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPaymentColor(purchase.paymentStatus)}`}>
-                        {purchase.paymentStatus ?? "UNPAID"}
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(purchase.status)}`}>
+                        {purchase.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex gap-2">
                         <Link
                           href={`/dashboard/purchases/${purchase.id}`}
-                          className="text-emerald-600 hover:text-emerald-800"
-                          title="View purchase"
+                          className="text-blue-600 hover:text-blue-800"
                         >
                           <Eye size={18} />
                         </Link>

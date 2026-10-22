@@ -2,51 +2,67 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
-import { FileText, Plus, Search, Eye, Trash2, Copy } from "lucide-react";
-import { formatCurrency } from "@/lib/invoice-utils";
-import { permissions } from "@/lib/permissions";
+import { FileText, Plus, Search, Eye, Trash2 } from "lucide-react";
 
 interface Invoice {
   id: string;
   invoiceNumber: string;
   customerName: string;
   total: number;
-  paidAmount: number;
-  balanceDue: number;
   status: string;
-  paymentType: string;
-  invoiceDate: string;
+  createdAt: string;
+}
+
+function isInvoiceList(value: unknown): value is Invoice[] {
+  return Array.isArray(value) && value.every((invoice: unknown) => {
+    if (typeof invoice !== "object" || invoice === null || Array.isArray(invoice)) return false;
+    const row = invoice as Record<string, unknown>;
+    return (
+      typeof row.id === "string" &&
+      typeof row.invoiceNumber === "string" &&
+      typeof row.customerName === "string" &&
+      typeof row.total === "number" &&
+      typeof row.status === "string" &&
+      typeof row.createdAt === "string"
+    );
+  });
 }
 
 export default function BillingPage() {
-  const { data: session } = useSession();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const canDelete = permissions.canDeleteInvoices(session?.user?.role ?? "STAFF");
-
-  const fetchInvoices = () => {
-    fetch("/api/invoices")
-      .then((r) => r.json())
-      .then(setInvoices)
-      .catch(console.error)
-      .finally(() => setIsLoading(false));
-  };
 
   useEffect(() => {
     fetchInvoices();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Cancel this invoice? Stock movements and cancellation history will be retained.")) return;
-    const res = await fetch(`/api/invoices/${id}`, { method: "DELETE" });
-    if (res.ok) fetchInvoices();
-  };
-
-  const handleDuplicate = async (id: string) => {
-    const res = await fetch(`/api/invoices/${id}?action=duplicate`, { method: "POST" });
-    if (res.ok) fetchInvoices();
+  const fetchInvoices = async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/invoices");
+      const data: unknown = await response.json();
+      if (!response.ok) {
+        const message =
+          typeof data === "object" &&
+          data !== null &&
+          "error" in data &&
+          typeof data.error === "string"
+            ? data.error
+            : "Could not load invoices";
+        throw new Error(message);
+      }
+      if (!isInvoiceList(data)) {
+        throw new Error("The server returned an unexpected invoice response");
+      }
+      setInvoices(data);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not load invoices");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const filteredInvoices = invoices.filter(
@@ -56,96 +72,100 @@ export default function BillingPage() {
   );
 
   const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      PAID: "bg-green-100 text-green-800",
-      OVERDUE: "bg-red-100 text-red-800",
-      SENT: "bg-blue-100 text-blue-800",
-      DRAFT: "bg-gray-100 text-gray-800",
-      PARTIALLY_PAID: "bg-yellow-100 text-yellow-800",
-      CANCELLED: "bg-red-100 text-red-800",
-    };
-    return colors[status] ?? "bg-gray-100 text-gray-800";
+    switch (status) {
+      case "PAID":
+        return "bg-green-100 text-green-800";
+      case "OVERDUE":
+        return "bg-red-100 text-red-800";
+      case "SENT":
+        return "bg-blue-100 text-blue-800";
+      case "DRAFT":
+        return "bg-gray-100 text-gray-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-brand-charcoal">Billing & Invoices</h1>
-          <p className="text-brand-muted mt-1">GST & Non-GST invoices with PDF export</p>
+          <h1 className="text-3xl font-bold text-gray-900">Billing & Invoices</h1>
+          <p className="text-gray-600 mt-1">Create and manage invoices with GST</p>
         </div>
         <Link
           href="/dashboard/billing/new"
-          className="flex items-center gap-2 bg-brand-gold hover:opacity-90 text-brand-charcoal px-6 py-3 rounded-2xl font-bold text-lg transition"
+          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition"
         >
-          <Plus size={22} />
-          New Bill
+          <Plus size={20} />
+          New Invoice
         </Link>
       </div>
 
       <div className="relative">
-        <Search className="absolute left-4 top-4 text-gray-400" size={20} />
+        <Search className="absolute left-3 top-3 text-gray-400" size={20} />
         <input
           type="text"
-          placeholder="Search invoice or customer..."
+          placeholder="Search by invoice number or customer..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-12 pr-4 py-3 text-lg border border-gray-200 rounded-2xl focus:ring-2 focus:ring-brand-emerald outline-none"
+          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
         />
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-lg shadow overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center text-brand-muted">Loading invoices...</div>
+          <div className="p-8 text-center text-gray-600">Loading invoices...</div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-700" role="alert">
+            <p>{error}</p>
+            <button onClick={fetchInvoices} className="mt-3 font-semibold underline">
+              Try again
+            </button>
+          </div>
         ) : filteredInvoices.length === 0 ? (
-          <div className="p-12 text-center text-brand-muted">
+          <div className="p-8 text-center text-gray-600">
             <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p>No invoices yet. Create your first invoice!</p>
+            <p>No invoices found. Create your first invoice!</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-brand-emerald text-white">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Invoice #</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Customer</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Amount</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Received / Due</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Payment</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Date</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Status</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Invoice #</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Customer</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Amount</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Date</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-gray-200">
                 {filteredInvoices.map((invoice) => (
-                  <tr key={invoice.id} className="hover:bg-brand-cream/50">
-                    <td className="px-6 py-4 font-medium">{invoice.invoiceNumber}</td>
-                    <td className="px-6 py-4 text-sm">{invoice.customerName}</td>
-                    <td className="px-6 py-4 font-semibold">{formatCurrency(invoice.total)}</td>
-                    <td className="px-6 py-4 text-xs"><span>Received {formatCurrency(invoice.paidAmount)}</span><br /><span className="text-brand-muted">Due {formatCurrency(invoice.balanceDue)}</span></td>
-                    <td className="px-6 py-4 text-sm">{invoice.paymentType}</td>
-                    <td className="px-6 py-4 text-sm">
-                      {new Date(invoice.invoiceDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}
+                  <tr key={invoice.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 font-medium text-gray-900">{invoice.invoiceNumber}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{invoice.customerName}</td>
+                    <td className="px-6 py-4 font-semibold text-gray-900">₹{invoice.total.toFixed(2)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {new Date(invoice.createdAt).toLocaleDateString("en-IN")}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(invoice.status)}`}>
                         {invoice.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-3">
-                        <Link href={`/dashboard/billing/${invoice.id}`} className="text-brand-emerald hover:opacity-70">
-                          <Eye size={20} />
+                    <td className="px-6 py-4 text-sm">
+                      <div className="flex gap-2">
+                        <Link
+                          href={`/dashboard/billing/${invoice.id}`}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          <Eye size={18} />
                         </Link>
-                        <button onClick={() => handleDuplicate(invoice.id)} className="text-brand-gold hover:opacity-70">
-                          <Copy size={20} />
+                        <button className="text-red-600 hover:text-red-800">
+                          <Trash2 size={18} />
                         </button>
-                        {canDelete && invoice.status !== "CANCELLED" && (
-                          <button onClick={() => handleDelete(invoice.id)} className="text-red-600 hover:opacity-70">
-                            <Trash2 size={20} />
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>

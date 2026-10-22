@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Briefcase, Plus, Search, Edit, Trash2, Eye } from "lucide-react";
+import { Briefcase, Plus, Search, Edit, Trash2 } from "lucide-react";
 
 interface Supplier {
   id: string;
@@ -28,8 +28,8 @@ export default function SuppliersPage() {
       const response = await fetch("/api/suppliers");
       const data = await response.json();
       setSuppliers(data);
-    } catch {
-      console.error("Failed to fetch suppliers");
+    } catch (error) {
+      console.error("Failed to fetch suppliers:", error);
     } finally {
       setIsLoading(false);
     }
@@ -49,8 +49,8 @@ export default function SuppliersPage() {
       } else {
         alert("Failed to delete supplier");
       }
-    } catch {
-      console.error("Delete error");
+    } catch (error) {
+      console.error("Delete error:", error);
       alert("Error deleting supplier");
     } finally {
       setIsDeleting(false);
@@ -120,9 +120,6 @@ export default function SuppliersPage() {
                     <td className="px-6 py-4 text-sm">{"⭐".repeat(Math.round(supplier.rating))}</td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex gap-2">
-                        <Link href={`/dashboard/suppliers/${supplier.id}`} className="text-emerald-600 hover:text-emerald-800" title="View supplier">
-                          <Eye size={18} />
-                        </Link>
                         <Link href={`/dashboard/suppliers/${supplier.id}/edit`} className="text-blue-600 hover:text-blue-800">
                           <Edit size={18} />
                         </Link>

@@ -1,4 +1,3 @@
-import { requireRole } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
@@ -13,16 +12,10 @@ const registerSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const existingUserCount = await prisma.user.count();
-
-    if (existingUserCount > 0) {
-      const session = await requireRole(request, ["OWNER"]);
-      if (session instanceof NextResponse) return session;
-    }
-
     const body = await request.json();
     const { email, password, name, phone } = registerSchema.parse(body);
 
+    // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -34,15 +27,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Hash password
     const hashedPassword = await hash(password, 10);
 
+    // Create user
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         name,
         phone,
-        role: "OWNER",
+        role: "OWNER", // First user is owner
       },
     });
 

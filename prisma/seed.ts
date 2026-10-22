@@ -1,44 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcryptjs";
 
-const categories = [
-  { slug: "WHOLE_SPICES", name: "Whole Spices", nameMarathi: "खडे मसाले" },
-  { slug: "POWDER_SPICES", name: "Powder Spices", nameMarathi: "पावडर मसाले" },
-  { slug: "DRY_FRUITS", name: "Dry Fruits", nameMarathi: "ड्राय फ्रूट्स" },
-  { slug: "SEEDS", name: "Seeds", nameMarathi: "बियाणे" },
-];
-
-const sampleProducts = [
-  { name: "Cumin Seeds", marathiName: "जिरे", sku: "JEERA-001", category: "WHOLE_SPICES", purchaseRate: 450, sellingRate: 550, stock: 200, min: 50, hsn: "0908.10" },
-  { name: "Coriander Seeds", marathiName: "धणे", sku: "DHANE-001", category: "WHOLE_SPICES", purchaseRate: 380, sellingRate: 480, stock: 150, min: 50, hsn: "0909.10" },
-  { name: "Cloves", marathiName: "लवंग", sku: "LAVANG-001", category: "WHOLE_SPICES", purchaseRate: 900, sellingRate: 1100, stock: 80, min: 20, hsn: "0907.10" },
-  { name: "Black Pepper", marathiName: "काळी मिरी", sku: "KALI-MIRI-001", category: "WHOLE_SPICES", purchaseRate: 650, sellingRate: 800, stock: 100, min: 30, hsn: "0904.20" },
-  { name: "Cinnamon", marathiName: "दालचिनी", sku: "DALCHINI-001", category: "WHOLE_SPICES", purchaseRate: 420, sellingRate: 520, stock: 120, min: 25, hsn: "0906.11" },
-  { name: "Green Cardamom", marathiName: "वेलची", sku: "VELCHI-001", category: "WHOLE_SPICES", purchaseRate: 1200, sellingRate: 1500, stock: 80, min: 20, hsn: "0908.31" },
-  { name: "Cashew W320", marathiName: "W320 काजू", sku: "KAJU-W320-001", category: "DRY_FRUITS", purchaseRate: 850, sellingRate: 980, stock: 60, min: 15, hsn: "0801.32" },
-  { name: "Almond", marathiName: "बदाम", sku: "BADAM-001", category: "DRY_FRUITS", purchaseRate: 720, sellingRate: 850, stock: 70, min: 15, hsn: "0802.11" },
-  { name: "Pistachio", marathiName: "पिस्ता", sku: "PISTA-001", category: "DRY_FRUITS", purchaseRate: 1100, sellingRate: 1300, stock: 45, min: 10, hsn: "0802.51" },
-];
-
 async function main() {
   console.log("🌱 Starting database seed...");
 
-  await prisma.customerPayment.deleteMany();
-  await prisma.supplierPayment.deleteMany();
-  await prisma.invoiceItem.deleteMany();
-  await prisma.invoice.deleteMany();
-  await prisma.purchaseItem.deleteMany();
-  await prisma.purchase.deleteMany();
-  await prisma.stockMovement.deleteMany();
-  await prisma.rateHistory.deleteMany();
-  await prisma.ledger.deleteMany();
-  await prisma.expense.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.category.deleteMany();
-  await prisma.customer.deleteMany();
-  await prisma.supplier.deleteMany();
-  await prisma.user.deleteMany();
-
+  // Create Owner
   const owner = await prisma.user.create({
     data: {
       email: "owner@zaintraders.com",
@@ -49,70 +15,100 @@ async function main() {
       isActive: true,
     },
   });
+  console.log("✅ Owner created:", owner.email);
 
+  // Create Staff
   const staff = await prisma.user.create({
     data: {
       email: "staff@zaintraders.com",
       password: await hash("password123", 10),
       name: "Staff Member",
-      phone: "9021276946",
+      phone: "8856915606",
       role: "STAFF",
       isActive: true,
     },
   });
+  console.log("✅ Staff created:", staff.email);
 
-  console.log("✅ Users created:", owner.email, staff.email);
+  // Create Accountant
+  const accountant = await prisma.user.create({
+    data: {
+      email: "accountant@zaintraders.com",
+      password: await hash("password123", 10),
+      name: "Accountant",
+      phone: "9876543210",
+      role: "ACCOUNTANT",
+      isActive: true,
+    },
+  });
+  console.log("✅ Accountant created:", accountant.email);
 
-  const categoryRecords = await Promise.all(
-    categories.map((cat) =>
-      prisma.category.create({
-        data: cat,
-      })
-    )
-  );
-
-  const categoryMap = Object.fromEntries(
-    categoryRecords.map((c) => [c.slug, c.id])
-  );
-
-  console.log(`✅ ${categoryRecords.length} categories created`);
-
-  const products = await Promise.all(
-    sampleProducts.map((p) =>
-      prisma.product.create({
-        data: {
-          name: p.name,
-          marathiName: p.marathiName,
-          sku: p.sku,
-          categoryId: categoryMap[p.category],
-          unit: "KG",
-          hsnCode: p.hsn,
-          gstPercentage: 5,
-          purchaseRate: p.purchaseRate,
-          sellingRate: p.sellingRate,
-          minimumStockLevel: p.min,
-          currentStock: p.stock,
-        },
-      })
-    )
-  );
-
+  // Create Sample Products
+  const products = await Promise.all([
+    prisma.product.create({
+      data: {
+        name: "Jeera",
+        marathiName: "जिरा",
+        sku: "JEERA-001",
+        category: "WHOLE_SPICES",
+        unit: "KG",
+        hsnCode: "0908.10",
+        gstPercentage: 5,
+        purchaseRate: 450,
+        sellingRate: 550,
+        minimumStockLevel: 50,
+        currentStock: 200,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        name: "Dhana",
+        marathiName: "धना",
+        sku: "DHANA-001",
+        category: "WHOLE_SPICES",
+        unit: "KG",
+        hsnCode: "0909.10",
+        gstPercentage: 5,
+        purchaseRate: 380,
+        sellingRate: 480,
+        minimumStockLevel: 50,
+        currentStock: 150,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        name: "Kali Miri",
+        marathiName: "काळी मिरी",
+        sku: "KALI-MIRI-001",
+        category: "WHOLE_SPICES",
+        unit: "KG",
+        hsnCode: "0904.20",
+        gstPercentage: 5,
+        purchaseRate: 650,
+        sellingRate: 800,
+        minimumStockLevel: 30,
+        currentStock: 100,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        name: "Elaichi",
+        marathiName: "एलाईची",
+        sku: "ELAICHI-001",
+        category: "WHOLE_SPICES",
+        unit: "KG",
+        hsnCode: "0908.30",
+        gstPercentage: 5,
+        purchaseRate: 1200,
+        sellingRate: 1500,
+        minimumStockLevel: 20,
+        currentStock: 80,
+      },
+    }),
+  ]);
   console.log(`✅ ${products.length} products created`);
 
-  await Promise.all(
-    products.map((product) =>
-      prisma.stockMovement.create({
-        data: {
-          productId: product.id,
-          movementType: "STOCK_IN",
-          quantity: product.currentStock,
-          referenceType: "SEED",
-          notes: "Initial stock from seed",
-        },
-      })
-    )
-  );
-
+  // Create Sample Suppliers
   const suppliers = await Promise.all([
     prisma.supplier.create({
       data: {
@@ -123,7 +119,7 @@ async function main() {
         city: "Mumbai",
         address: "123, Spice Market, Mumbai",
         gstNumber: "27AAACR1234H2Z5",
-        productCategories: ["WHOLE_SPICES", "DRY_FRUITS"],
+        productCategories: ["WHOLE_SPICES", "POWDER_SPICES"],
         rating: 4.5,
       },
     }),
@@ -141,13 +137,15 @@ async function main() {
       },
     }),
   ]);
+  console.log(`✅ ${suppliers.length} suppliers created`);
 
+  // Create Sample Customers
   const customers = await Promise.all([
     prisma.customer.create({
       data: {
         name: "ABC Traders",
         mobile: "9111222333",
-        address: "Pune, Maharashtra",
+        address: "Pune",
         gstNumber: "27AABCT1234H2Z5",
         creditLimit: 50000,
       },
@@ -156,18 +154,15 @@ async function main() {
       data: {
         name: "XYZ Wholesale",
         mobile: "9222333444",
-        address: "Mumbai, Maharashtra",
+        address: "Mumbai",
         gstNumber: "27AAACR1234H2Z5",
         creditLimit: 75000,
       },
     }),
   ]);
+  console.log(`✅ ${customers.length} customers created`);
 
-  console.log(`✅ ${suppliers.length} suppliers, ${customers.length} customers created`);
   console.log("🎉 Seed completed successfully!");
-  console.log("\nLogin credentials:");
-  console.log("  Owner: owner@zaintraders.com / password123");
-  console.log("  Staff: staff@zaintraders.com / password123");
 }
 
 main()

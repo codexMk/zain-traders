@@ -104,7 +104,7 @@ export default function CustomerForm({ initialData, isEditing }: CustomerFormPro
       setTimeout(() => {
         router.push("/dashboard/customers");
       }, 1500);
-    } catch {
+    } catch (err) {
       setError("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);

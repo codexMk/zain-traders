@@ -5,10 +5,8 @@ import { z } from "zod";
 
 const createCustomerSchema = z.object({
   name: z.string().min(1),
-  shopName: z.string().optional(),
   mobile: z.string().min(1),
   address: z.string().min(1),
-  stateCode: z.string().regex(/^\d{2}$/).optional(),
   gstNumber: z.string().optional(),
   creditLimit: z.number().default(0),
 });
@@ -18,26 +16,13 @@ export async function GET(request: NextRequest) {
     const session = await requireAuth(request);
     if (session instanceof NextResponse) return session;
 
-    const search = new URL(request.url).searchParams.get("search")?.trim();
     const customers = await prisma.customer.findMany({
-      where: {
-        isActive: true,
-        ...(search ? { OR: [
-          { name: { contains: search, mode: "insensitive" } },
-          { shopName: { contains: search, mode: "insensitive" } },
-          { mobile: { contains: search } },
-        ] } : {}),
-      },
-      include: { invoices: { where: { status: { notIn: ["DRAFT", "CANCELLED"] } }, orderBy: { invoiceDate: "desc" }, take: 1, select: { invoiceDate: true } } },
-      orderBy: { updatedAt: "desc" },
-      take: search ? 15 : 200,
+      where: { isActive: true },
+      orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json(customers.map(({ invoices, ...customer }) => ({
-      ...customer,
-      previousInvoiceDate: invoices[0]?.invoiceDate ?? null,
-    })));
-  } catch {
+    return NextResponse.json(customers);
+  } catch (error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

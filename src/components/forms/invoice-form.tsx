@@ -20,7 +20,6 @@ interface Product {
 interface InvoiceInitialData {
   id?: string;
   customerId?: string;
-  deliveryBy?: string;
   discount?: number;
   items?: LineItem[];
 }
@@ -47,7 +46,6 @@ export default function InvoiceForm({ initialData, isEditing }: InvoiceFormProps
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState(initialData?.customerId || "");
-  const [deliveryBy, setDeliveryBy] = useState(initialData?.deliveryBy || "");
   const [discount, setDiscount] = useState(initialData?.discount || 0);
   const [lineItems, setLineItems] = useState<LineItem[]>(initialData?.items || []);
 
@@ -147,7 +145,6 @@ export default function InvoiceForm({ initialData, isEditing }: InvoiceFormProps
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerId: selectedCustomer,
-          deliveryBy: deliveryBy.trim(),
           discount,
           items: lineItems,
         }),
@@ -163,7 +160,7 @@ export default function InvoiceForm({ initialData, isEditing }: InvoiceFormProps
       setTimeout(() => {
         router.push("/dashboard/billing");
       }, 1500);
-    } catch {
+    } catch (err) {
       setError("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
@@ -228,20 +225,6 @@ export default function InvoiceForm({ initialData, isEditing }: InvoiceFormProps
                 </option>
               ))}
             </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Delivery By
-            </label>
-            <input
-              type="text"
-              value={deliveryBy}
-              onChange={(e) => setDeliveryBy(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-              placeholder="Enter delivery place or person"
-              disabled={isLoading}
-            />
           </div>
 
           {/* Line Items */}

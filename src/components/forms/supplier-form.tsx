@@ -122,7 +122,7 @@ export default function SupplierForm({ initialData, isEditing }: SupplierFormPro
       setTimeout(() => {
         router.push("/dashboard/suppliers");
       }, 1500);
-    } catch {
+    } catch (err) {
       setError("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);

@@ -1,3 +1,6 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -5,14 +8,19 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  // uncomment next line if you use Prisma <5.10
-  // directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 enum UserRole {
   OWNER
   STAFF
   ACCOUNTANT
+}
+
+enum ProductCategory {
+  WHOLE_SPICES
+  POWDER_SPICES
+  DRY_FRUITS
+  OTHER_PRODUCTS
 }
 
 enum Unit {
@@ -33,28 +41,6 @@ enum InvoiceStatus {
   PAID
   PARTIALLY_PAID
   OVERDUE
-  CANCELLED
-}
-
-enum PaymentType {
-  CASH
-  UPI
-  CREDIT
-}
-
-enum StockMovementType {
-  PURCHASE
-  SALE
-  STOCK_IN
-  STOCK_OUT
-  DAMAGED
-  ADJUSTMENT
-}
-
-enum StockMovementStatus {
-  PENDING
-  POSTED
-  REJECTED
 }
 
 enum MarketLocation {
@@ -64,66 +50,60 @@ enum MarketLocation {
   DHARASHIV
 }
 
-model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  password       String?
-  name           String
-  phone          String?
-  role           UserRole @default(STAFF)
-  isActive       Boolean  @default(true)
-  sessionVersion Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+enum StockMovementType {
+  PURCHASE
+  SALE
+  DAMAGED
+  ADJUSTMENT
+}
 
-  invoicesCreated Invoice[] @relation("InvoiceCreatedBy")
+// User Management
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String?
+  name          String
+  phone         String?
+  role          UserRole  @default(STAFF)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([email])
   @@index([role])
 }
 
-model Category {
-  id          String   @id @default(cuid())
-  name        String
-  nameMarathi String?
-  slug        String   @unique
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  products Product[]
-
-  @@index([slug])
-}
-
+// Product Management (Module 2)
 model Product {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   name              String
   marathiName       String?
-  sku               String   @unique
-  categoryId        String
+  sku               String    @unique
+  category          ProductCategory
   unit              Unit
   hsnCode           String?
-  gstPercentage     Float    @default(5)
+  gstPercentage     Float     @default(5)
   purchaseRate      Float
   sellingRate       Float
-  currentStock      Float    @default(0)
-  minimumStockLevel Float    @default(0)
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  currentStock      Float     @default(0)
+  minimumStockLevel Float     @default(0)
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  category       Category        @relation(fields: [categoryId], references: [id])
-  purchaseItems  PurchaseItem[]
-  invoiceItems   InvoiceItem[]
-  stockMovements StockMovement[]
-  rateHistories  RateHistory[]
+  // Relations
+  purchaseItems     PurchaseItem[]
+  invoiceItems      InvoiceItem[]
+  stockMovements    StockMovement[]
+  rateHistories     RateHistory[]
 
-  @@index([categoryId])
+  @@index([category])
   @@index([sku])
 }
 
+// Supplier Management (Module 3)
 model Supplier {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   name              String
   contactPerson     String?
   mobile            String
@@ -131,125 +111,111 @@ model Supplier {
   city              String
   address           String
   gstNumber         String?
-  productCategories String[] @default([])
-  rating            Float    @default(0)
+  productCategories String[]  @default([])
+  rating            Float     @default(0)
   notes             String?
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  purchases      Purchase[]
-  paymentHistory SupplierPayment[]
+  // Relations
+  purchases         Purchase[]
+  paymentHistory    SupplierPayment[]
 
   @@index([city])
   @@index([name])
 }
 
+// Customer Management (Module 5)
 model Customer {
-  id                String   @id @default(cuid())
-  name              String
-  shopName          String?
-  mobile            String   @unique
-  address           String
-  stateCode         String?
-  gstNumber         String?
-  creditLimit       Float    @default(0)
-  outstandingAmount Float    @default(0)
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String    @id @default(cuid())
+  name            String
+  mobile          String    @unique
+  address         String
+  gstNumber       String?
+  creditLimit     Float     @default(0)
+  outstandingAmount Float  @default(0)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  invoices       Invoice[]
-  paymentHistory CustomerPayment[]
-  ledgerEntries  Ledger[]
+  // Relations
+  invoices        Invoice[]
+  paymentHistory  CustomerPayment[]
+  ledgerEntries   Ledger[]
 
   @@index([name])
   @@index([mobile])
 }
 
+// Purchase Management (Module 4)
 model Purchase {
-  id            String   @id @default(cuid())
-  supplierId    String
-  invoiceNumber String   @unique
-  purchaseDate  DateTime
-  taxableAmount Float    @default(0)
-  totalAmount   Float
-  gstAmount     Float    @default(0)
-  transportCost Float    @default(0)
-  loadingCost   Float    @default(0)
-  otherCharges  Float    @default(0)
-  notes         String?
-  isCompleted   Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                String    @id @default(cuid())
+  supplierId        String
+  invoiceNumber     String    @unique
+  purchaseDate      DateTime
+  totalAmount       Float
+  gstAmount         Float     @default(0)
+  transportCost     Float     @default(0)
+  loadingCost       Float     @default(0)
+  otherCharges      Float     @default(0)
+  notes             String?
+  isCompleted       Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  supplier Supplier          @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  items    PurchaseItem[]
-  payments SupplierPayment[]
+  // Relations
+  supplier          Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  items             PurchaseItem[]
+  payments          SupplierPayment[]
 
   @@index([supplierId])
   @@index([purchaseDate])
 }
 
 model PurchaseItem {
-  id            String @id @default(cuid())
+  id            String    @id @default(cuid())
   purchaseId    String
   productId     String
   quantity      Float
   rate          Float
-  gstPercentage Float  @default(5)
+  gstPercentage Float     @default(5)
   amount        Float
 
-  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  product  Product  @relation(fields: [productId], references: [id])
+  // Relations
+  purchase      Purchase  @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product       Product   @relation(fields: [productId], references: [id])
 
   @@unique([purchaseId, productId])
 }
 
+// Billing System (Module 6)
 model Invoice {
-  id                     String        @id @default(cuid())
-  invoiceNumber          String        @unique
-  idempotencyKey         String?       @unique
-  customerId             String?
-  customerName           String        @default("")
-  customerMobile         String?
-  customerAddress        String        @default("")
-  customerGstNumber      String?
-  customerStateCode      String?
-  placeOfSupplyStateCode String?
-  supplierName           String        @default("Zain Traders")
-  supplierAddress        String        @default("")
-  supplierGstin          String?
-  supplierPhones         String[]      @default([])
-  invoiceDate            DateTime
-  dueDate                DateTime?
-  invoiceType            InvoiceType   @default(GST_INVOICE)
-  status                 InvoiceStatus @default(DRAFT)
-  paymentType            PaymentType   @default(CASH)
-  gstEnabled             Boolean       @default(true)
-  subtotal               Float
-  discountAmount         Float         @default(0)
-  discountPercent        Float         @default(0)
-  taxableAmount          Float
-  gstAmount              Float
-  cgstAmount             Float         @default(0)
-  sgstAmount             Float         @default(0)
-  igstAmount             Float         @default(0)
-  totalAmount            Float
-  paidAmount             Float         @default(0)
-  deliveryBy             String?
-  notes                  String?
-  cancelledAt            DateTime?
-  cancelledById          String?
-  cancellationReason     String?
-  createdById            String?
-  createdAt              DateTime      @default(now())
-  updatedAt              DateTime      @updatedAt
+  id                String    @id @default(cuid())
+  invoiceNumber     String    @unique
+  customerId        String
+  invoiceDate       DateTime
+  dueDate           DateTime?
+  invoiceType       InvoiceType @default(GST_INVOICE)
+  status            InvoiceStatus @default(DRAFT)
 
-  customer  Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  createdBy User?             @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
-  items     InvoiceItem[]
-  payments  CustomerPayment[]
+  subtotal          Float
+  discountAmount    Float     @default(0)
+  discountPercent   Float     @default(0)
+  taxableAmount     Float
+  gstAmount         Float
+  totalAmount       Float
+
+  paidAmount        Float     @default(0)
+  notes             String?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  customer          Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items             InvoiceItem[]
+  payments          CustomerPayment[]
 
   @@index([customerId])
   @@index([invoiceDate])
@@ -257,71 +223,56 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id              String  @id @default(cuid())
-  invoiceId       String
-  productId       String?
-  productName     String  @default("")
-  productSku      String?
-  hsnCode         String?
-  unit            String  @default("PIECE")
-  quantity        Float
-  rate            Float
-  discountPercent Float   @default(0)
-  discountAmount  Float   @default(0)
-  gstPercent      Float
-  amount          Float
-  lineSubtotal    Float   @default(0)
-  taxableAmount   Float   @default(0)
-  cgstAmount      Float   @default(0)
-  sgstAmount      Float   @default(0)
-  igstAmount      Float   @default(0)
+  id          String    @id @default(cuid())
+  invoiceId   String
+  productId   String
+  quantity    Float
+  rate        Float
+  gstPercent  Float
+  amount      Float
 
-  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  // Relations
+  invoice     Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product     Product   @relation(fields: [productId], references: [id])
 
-  @@index([invoiceId])
-  @@index([productId])
+  @@unique([invoiceId, productId])
 }
 
+// Inventory Management (Module 7)
 model StockMovement {
-  id             String              @id @default(cuid())
-  productId      String
-  movementType   StockMovementType
-  quantity       Float
-  quantityChange Float               @default(0)
-  balanceAfter   Float?
-  referenceId    String?
-  referenceType  String?
-  reason         String?
-  lotNumber      String?
-  notes          String?
-  status         StockMovementStatus @default(POSTED)
-  approvedById   String?
-  approvedAt     DateTime?
-  createdAt      DateTime            @default(now())
+  id              String    @id @default(cuid())
+  productId       String
+  movementType    StockMovementType
+  quantity        Float
+  referenceId     String?   // Purchase ID or Invoice ID
+  referenceType   String?   // PURCHASE or SALE or DAMAGE
+  notes           String?
+  createdAt       DateTime  @default(now())
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // Relations
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([createdAt])
   @@index([movementType])
-  @@index([status])
-  @@index([productId, lotNumber])
 }
 
+// Accounting (Module 8)
 model Ledger {
-  id          String   @id @default(cuid())
-  customerId  String?
-  supplierId  String?
-  entryDate   DateTime
-  description String
-  debit       Float    @default(0)
-  credit      Float    @default(0)
-  balance     Float
-  ledgerType  String
-  createdAt   DateTime @default(now())
+  id              String    @id @default(cuid())
+  customerId      String?
+  supplierId      String?
+  entryDate       DateTime
+  description     String
+  debit           Float     @default(0)
+  credit          Float     @default(0)
+  balance         Float
+  ledgerType      String    // SALES, PURCHASE, EXPENSE, INCOME
 
-  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  customer        Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
   @@index([entryDate])
@@ -329,91 +280,76 @@ model Ledger {
 }
 
 model Expense {
-  id          String   @id @default(cuid())
-  category    String
-  amount      Float
-  description String
-  expenseDate DateTime
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String    @id @default(cuid())
+  category        String
+  amount          Float
+  description     String
+  expenseDate     DateTime
+  notes           String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([expenseDate])
   @@index([category])
 }
 
+// Rate History (Module 9)
 model RateHistory {
-  id        String         @id @default(cuid())
-  productId String
-  market    MarketLocation
-  rate      Float
-  date      DateTime
-  notes     String?
-  createdAt DateTime       @default(now())
+  id              String    @id @default(cuid())
+  productId       String
+  market          MarketLocation
+  rate            Float
+  date            DateTime
+  notes           String?
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([date])
   @@index([market])
 }
 
+// Payment Tracking
 model SupplierPayment {
-  id             String   @id @default(cuid())
-  purchaseId     String
-  supplierId     String
-  amount         Float
-  paymentDate    DateTime
-  paymentMethod  String
-  reference      String?
-  idempotencyKey String?  @unique
-  notes          String?
-  createdAt      DateTime @default(now())
+  id              String    @id @default(cuid())
+  purchaseId      String
+  supplierId      String
+  amount          Float
+  paymentDate     DateTime
+  paymentMethod   String    // CASH, CHEQUE, BANK, DIGITAL
+  reference       String?
+  notes           String?
 
-  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
 
-  @@unique([purchaseId, reference])
+  // Relations
+  purchase        Purchase  @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  supplier        Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
   @@index([supplierId])
   @@index([paymentDate])
-  @@index([purchaseId])
 }
 
 model CustomerPayment {
-  id             String    @id @default(cuid())
-  invoiceId      String
-  customerId     String?
-  amount         Float
-  paymentDate    DateTime
-  paymentMethod  String
-  reference      String?
-  idempotencyKey String?   @unique
-  notes          String?
-  reversedAt     DateTime?
-  reversedById   String?
-  reversalReason String?
-  createdAt      DateTime  @default(now())
+  id              String    @id @default(cuid())
+  invoiceId       String
+  customerId      String
+  amount          Float
+  paymentDate     DateTime
+  paymentMethod   String    // CASH, CHEQUE, BANK, DIGITAL
+  reference       String?
+  notes           String?
 
-  invoice  Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
 
-  @@unique([invoiceId, reference])
+  // Relations
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
   @@index([customerId])
   @@index([paymentDate])
-  @@index([invoiceId])
-}
-
-model BusinessSettings {
-  id                  String   @id @default("default")
-  legalName           String   @default("Zain Traders")
-  address             String?
-  phoneNumbers        String[] @default([])
-  gstin               String?
-  registeredStateCode String?
-  updatedAt           DateTime @updatedAt
-}
-
-model InvoiceCounter {
-  year     Int @id
-  sequence Int @default(0)
 }

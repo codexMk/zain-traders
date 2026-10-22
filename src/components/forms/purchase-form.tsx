@@ -149,7 +149,7 @@ export default function PurchaseForm({ initialData, isEditing }: PurchaseFormPro
       setTimeout(() => {
         router.push("/dashboard/purchases");
       }, 1500);
-    } catch {
+    } catch (err) {
       setError("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
