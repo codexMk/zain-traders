@@ -1,160 +1,133 @@
 import { requireAuth } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { indiaDateKey, indiaStartOfDay, isValidDateOnly } from "@/lib/date-utils";
 import { NextRequest, NextResponse } from "next/server";
+
+const dateKey = (date: Date) => indiaDateKey(date);
+const shiftDay = (key: string, amount: number) => {
+  const date = new Date(`${key}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + amount);
+  return date.toISOString().slice(0, 10);
+};
+const startAtIndia = (key: string) => indiaStartOfDay(key);
+const monthKey = (key: string) => key.slice(0, 7);
+const shiftMonth = (key: string, amount: number) => {
+  const date = new Date(`${key}-01T12:00:00Z`);
+  date.setUTCMonth(date.getUTCMonth() + amount);
+  return date.toISOString().slice(0, 7);
+};
 
 export async function GET(request: NextRequest) {
   try {
     const session = await requireAuth(request);
     if (session instanceof NextResponse) return session;
+    const today = dateKey(new Date());
+    const search = request.nextUrl.searchParams;
+    const fromParam = search.get("from");
+    const toParam = search.get("to");
+    if ((fromParam && !isValidDateOnly(fromParam)) || (toParam && !isValidDateOnly(toParam))) {
+      return NextResponse.json({ error: "Use YYYY-MM-DD for the date range" }, { status: 400 });
+    }
+    const rangeFrom = fromParam || today;
+    const rangeTo = toParam || rangeFrom;
+    if (rangeFrom > rangeTo) return NextResponse.json({ error: "Start date must be on or before end date" }, { status: 400 });
+    const rangeStart = startAtIndia(rangeFrom);
+    const rangeEnd = startAtIndia(shiftDay(rangeTo, 1));
+    const todayStart = startAtIndia(today);
+    const tomorrowStart = startAtIndia(shiftDay(today, 1));
+    const weekStart = startAtIndia(shiftDay(today, -6));
+    const monthStart = startAtIndia(`${today.slice(0, 7)}-01`);
+    const salesWhere: Prisma.InvoiceWhereInput = { status: { notIn: ["DRAFT", "CANCELLED"] } };
 
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const revenueStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-
+    const monthLabels = Array.from({ length: 6 }, (_, index) => shiftMonth(monthKey(today), index - 5));
+    const trendStart = startAtIndia(`${monthLabels[0]}-01`);
     const [
+      rangeInvoices,
       todayInvoices,
-      monthlyInvoices,
+      weekInvoices,
+      monthInvoices,
+      trendInvoices,
+      rangePayments,
+      trendPayments,
+      allReceivables,
       totalCustomers,
-      pendingPayments,
-      allInvoiceItems,
-      monthlyRevenueRows,
       lowStock,
       recentInvoices,
+      rangeItems,
     ] = await Promise.all([
-      prisma.invoice.findMany({
-        where: { invoiceDate: { gte: startOfDay }, status: { not: "DRAFT" } },
-        select: { totalAmount: true },
-      }),
-      prisma.invoice.findMany({
-        where: { invoiceDate: { gte: startOfMonth }, status: { not: "DRAFT" } },
-        select: { totalAmount: true },
-      }),
+      prisma.invoice.findMany({ where: { ...salesWhere, invoiceDate: { gte: rangeStart, lt: rangeEnd } }, select: { id: true, invoiceNumber: true, customerId: true, customerName: true, invoiceDate: true, totalAmount: true, paidAmount: true, status: true } }),
+      prisma.invoice.findMany({ where: { ...salesWhere, invoiceDate: { gte: todayStart, lt: tomorrowStart } }, select: { totalAmount: true } }),
+      prisma.invoice.findMany({ where: { ...salesWhere, invoiceDate: { gte: weekStart, lt: tomorrowStart } }, select: { totalAmount: true } }),
+      prisma.invoice.findMany({ where: { ...salesWhere, invoiceDate: { gte: monthStart, lt: tomorrowStart } }, select: { totalAmount: true } }),
+      prisma.invoice.findMany({ where: { ...salesWhere, invoiceDate: { gte: trendStart, lt: tomorrowStart } }, select: { invoiceDate: true, totalAmount: true } }),
+      prisma.customerPayment.findMany({ where: { paymentDate: { gte: rangeStart, lt: rangeEnd }, reversedAt: null, invoice: { status: { notIn: ["DRAFT", "CANCELLED"] } } }, select: { amount: true } }),
+      prisma.customerPayment.findMany({ where: { paymentDate: { gte: trendStart, lt: tomorrowStart }, reversedAt: null, invoice: { status: { notIn: ["DRAFT", "CANCELLED"] } } }, select: { paymentDate: true, amount: true } }),
+      prisma.invoice.findMany({ where: salesWhere, select: { totalAmount: true, paidAmount: true } }),
       prisma.customer.count({ where: { isActive: true } }),
-      prisma.invoice.count({
-        where: {
-          status: { in: ["SENT", "PARTIALLY_PAID", "OVERDUE"] },
-        },
-      }),
-      prisma.invoiceItem.findMany({
-        select: { productId: true, quantity: true, amount: true },
-      }),
-      prisma.invoice.findMany({
-        where: {
-          invoiceDate: { gte: revenueStart },
-          status: { not: "DRAFT" },
-        },
-        select: { invoiceDate: true, totalAmount: true },
-      }),
-      prisma.product
-        .findMany({
-          where: { isActive: true },
-          include: { category: true },
-        })
-        .then((products) =>
-          products.filter((p) => p.currentStock <= p.minimumStockLevel).slice(0, 10)
-        ),
-      prisma.invoice.findMany({
-        take: 5,
-        orderBy: { createdAt: "desc" },
-        include: { customer: { select: { name: true } } },
-      }),
+      prisma.product.findMany({ where: { isActive: true }, include: { category: true }, orderBy: { currentStock: "asc" } }),
+      prisma.invoice.findMany({ where: salesWhere, take: 5, orderBy: { createdAt: "desc" }, select: { id: true, invoiceNumber: true, customerName: true, totalAmount: true, invoiceDate: true, status: true } }),
+      prisma.invoiceItem.findMany({ where: { invoice: { ...salesWhere, invoiceDate: { gte: rangeStart, lt: rangeEnd } } }, select: { productId: true, productName: true, quantity: true, amount: true } }),
     ]);
 
-    const todaySales = todayInvoices.reduce(
-      (sum, invoice) => sum + Number(invoice.totalAmount ?? 0),
-      0
-    );
-    const monthlySales = monthlyInvoices.reduce(
-      (sum, invoice) => sum + Number(invoice.totalAmount ?? 0),
-      0
-    );
-
-    const productTotals = new Map<
-      string,
-      { productId: string; quantity: number; value: number }
-    >();
-
-    allInvoiceItems.forEach((item) => {
-      const previous = productTotals.get(item.productId) ?? {
-        productId: item.productId,
-        quantity: 0,
-        value: 0,
-      };
-
-      productTotals.set(item.productId, {
-        productId: item.productId,
-        quantity: previous.quantity + Number(item.quantity ?? 0),
-        value: previous.value + Number(item.amount ?? 0),
-      });
-    });
-
-    const productIds = [...productTotals.keys()];
-    const productDetails = await prisma.product.findMany({
-      where: { id: { in: productIds } },
-      select: { id: true, name: true, marathiName: true },
-    });
-
-    const topSelling = [...productTotals.values()]
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5)
-      .map((entry) => {
-        const product = productDetails.find((item) => item.id === entry.productId);
-        return {
-          name: product?.marathiName || product?.name || "Unknown",
-          value: entry.value,
-          quantity: entry.quantity,
-        };
-      });
-
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const revenueByMonth: Record<string, number> = {};
-
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-      revenueByMonth[key] = 0;
+    const outstanding = allReceivables.reduce((sum, invoice) => sum + Math.max(0, invoice.totalAmount - invoice.paidAmount), 0);
+    const rangeCollections = rangePayments.reduce((sum, payment) => sum + payment.amount, 0);
+    const productMap = new Map<string, { name: string; quantity: number; value: number }>();
+    for (const item of rangeItems) {
+      const key = item.productId ?? `one-time:${item.productName}`;
+      const previous = productMap.get(key) ?? { name: item.productName || "Item", quantity: 0, value: 0 };
+      productMap.set(key, { name: previous.name, quantity: previous.quantity + item.quantity, value: previous.value + item.amount });
+    }
+    const customerMap = new Map<string, { id: string; name: string; purchaseValue: number; invoiceCount: number }>();
+    for (const invoice of rangeInvoices) {
+      if (!invoice.customerId) continue;
+      const previous = customerMap.get(invoice.customerId) ?? { id: invoice.customerId, name: invoice.customerName || "Customer", purchaseValue: 0, invoiceCount: 0 };
+      customerMap.set(invoice.customerId, { ...previous, purchaseValue: previous.purchaseValue + invoice.totalAmount, invoiceCount: previous.invoiceCount + 1 });
+    }
+    const salesByMonth = new Map<string, number>();
+    const collectionsByMonth = new Map<string, number>();
+    for (const key of monthLabels) { salesByMonth.set(key, 0); collectionsByMonth.set(key, 0); }
+    for (const invoice of trendInvoices) {
+      const key = monthKey(dateKey(invoice.invoiceDate));
+      salesByMonth.set(key, (salesByMonth.get(key) ?? 0) + invoice.totalAmount);
+    }
+    for (const payment of trendPayments) {
+      const key = monthKey(dateKey(payment.paymentDate));
+      collectionsByMonth.set(key, (collectionsByMonth.get(key) ?? 0) + payment.amount);
+    }
+    const dailyLabels = Array.from({ length: 7 }, (_, index) => shiftDay(today, index - 6));
+    const dailySales = new Map(dailyLabels.map((key) => [key, 0]));
+    for (const invoice of trendInvoices) {
+      const key = dateKey(invoice.invoiceDate);
+      if (dailySales.has(key)) dailySales.set(key, (dailySales.get(key) ?? 0) + invoice.totalAmount);
     }
 
-    monthlyRevenueRows.forEach((row) => {
-      const d = new Date(row.invoiceDate);
-      const key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-      if (key in revenueByMonth) {
-        revenueByMonth[key] += Number(row.totalAmount ?? 0);
-      }
-    });
-
     return NextResponse.json({
-      todaySales,
+      dateRange: { from: rangeFrom, to: rangeTo },
+      todaySales: todayInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0),
       todayInvoiceCount: todayInvoices.length,
-      monthlySales,
-      monthlyInvoiceCount: monthlyInvoices.length,
+      weeklySales: weekInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0),
+      monthlySales: monthInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0),
+      monthlyInvoiceCount: monthInvoices.length,
+      rangeSales: rangeInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0),
+      rangeInvoiceCount: rangeInvoices.length,
+      rangeCollections,
+      totalOutstanding: outstanding,
+      totalInvoiceCount: allReceivables.length,
       totalCustomers,
-      lowStockCount: lowStock.length,
-      lowStockProducts: lowStock.map((p) => ({
-        id: p.id,
-        name: p.marathiName || p.name,
-        currentStock: p.currentStock,
-        minimumStockLevel: p.minimumStockLevel,
-        category: p.category?.name ?? "General",
-      })),
-      pendingPayments,
-      topSellingProducts: topSelling,
-      monthlyRevenueChart: Object.entries(revenueByMonth).map(([name, revenue]) => ({
-        name,
-        revenue,
-      })),
-      recentActivity: recentInvoices.map((inv) => ({
-        id: inv.id,
-        title: `Invoice ${inv.invoiceNumber}`,
-        customer: inv.customer?.name ?? "Unknown customer",
-        amount: Number(inv.totalAmount ?? 0),
-        date: inv.createdAt,
-        status: inv.status,
-      })),
+      repeatCustomerCount: [...customerMap.values()].filter((customer) => customer.invoiceCount > 1).length,
+      lowStockCount: lowStock.filter((product) => product.currentStock <= product.minimumStockLevel).length,
+      lowStockProducts: lowStock.filter((product) => product.currentStock <= product.minimumStockLevel).slice(0, 10).map((product) => ({ id: product.id, name: product.marathiName || product.name, currentStock: product.currentStock, minimumStockLevel: product.minimumStockLevel, category: product.category?.name ?? "General" })),
+      pendingPayments: allReceivables.filter((invoice) => invoice.totalAmount > invoice.paidAmount).length,
+      topSellingProducts: [...productMap.values()].sort((a, b) => b.value - a.value).slice(0, 5),
+      topCustomers: [...customerMap.values()].sort((a, b) => b.purchaseValue - a.purchaseValue).slice(0, 5),
+      monthlyRevenueChart: monthLabels.map((key) => ({ name: new Intl.DateTimeFormat("en", { month: "short", timeZone: "UTC" }).format(new Date(`${key}-01T12:00:00Z`)), revenue: salesByMonth.get(key) ?? 0 })),
+      monthlyCollectionsChart: monthLabels.map((key) => ({ name: new Intl.DateTimeFormat("en", { month: "short", timeZone: "UTC" }).format(new Date(`${key}-01T12:00:00Z`)), collections: collectionsByMonth.get(key) ?? 0 })),
+      dailySalesChart: dailyLabels.map((key) => ({ name: key.slice(5), sales: dailySales.get(key) ?? 0 })),
+      recentActivity: recentInvoices.map((invoice) => ({ id: invoice.id, title: `Invoice ${invoice.invoiceNumber}`, customer: invoice.customerName || "Walk-in Customer", amount: invoice.totalAmount, date: invoice.invoiceDate, status: invoice.status })),
     });
   } catch (error) {
     console.error("GET /api/dashboard/stats failed", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+import { Prisma } from "@prisma/client";

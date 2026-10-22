@@ -1,124 +1,50 @@
 import { requireAuth } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { indiaDateKey, indiaStartOfDay, isValidDateOnly } from "@/lib/date-utils";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   try {
     const session = await requireAuth(request);
     if (session instanceof NextResponse) return session;
-
     const { searchParams } = new URL(request.url);
-    const fromParam = searchParams.get("from");
-    const toParam = searchParams.get("to");
+    const today = indiaDateKey();
+    const fromKey = searchParams.get("from") || `${today.slice(0, 7)}-01`;
+    const toKey = searchParams.get("to") || today;
+    if (!isValidDateOnly(fromKey) || !isValidDateOnly(toKey) || fromKey > toKey) return NextResponse.json({ error: "Choose a valid YYYY-MM-DD date range" }, { status: 400 });
+    const from = indiaStartOfDay(fromKey);
+    const endExclusive = indiaStartOfDay(toKey).getTime() + 24 * 60 * 60 * 1000;
+    const end = new Date(endExclusive);
+    const finalized = { status: { notIn: ["DRAFT", "CANCELLED"] as ("DRAFT" | "CANCELLED")[] } };
 
-    const from = fromParam ? new Date(fromParam) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const to = toParam ? new Date(toParam) : new Date();
-    to.setHours(23, 59, 59, 999);
-
-    const [salesData, expenseData, customerSummary, purchaseSummary, supplierPayments, recentLedger] = await Promise.all([
-      prisma.invoice.findMany({
-        where: {
-          invoiceDate: { gte: from, lte: to },
-          status: { not: "DRAFT" },
-        },
-        select: {
-          totalAmount: true,
-          paidAmount: true,
-          paymentType: true,
-          gstAmount: true,
-          invoiceNumber: true,
-          customer: { select: { name: true } },
-          invoiceDate: true,
-        },
-      }),
-      prisma.expense.groupBy({
-        by: ["category"],
-        where: {
-          expenseDate: { gte: from, lte: to },
-        },
-        _sum: {
-          amount: true,
-        },
-      }),
-      prisma.customer.aggregate({
-        _sum: {
-          outstandingAmount: true,
-        },
-      }),
-      prisma.purchase.aggregate({
-        _sum: {
-          totalAmount: true,
-        },
-        where: {
-          purchaseDate: { gte: from, lte: to },
-        },
-      }),
-      prisma.supplierPayment.aggregate({
-        _sum: {
-          amount: true,
-        },
-        where: {
-          paymentDate: { gte: from, lte: to },
-        },
-      }),
-      prisma.ledger.findMany({
-        where: {
-          entryDate: { gte: from, lte: to },
-        },
-        orderBy: { entryDate: "desc" },
-        take: 12,
-        include: {
-          customer: { select: { name: true } },
-        },
-      }),
+    const [sales, expenses, allInvoices, receipts, allPurchases, allSupplierPayments, ledger] = await Promise.all([
+      prisma.invoice.findMany({ where: { ...finalized, invoiceDate: { gte: from, lt: end } }, select: { totalAmount: true, paidAmount: true, gstAmount: true, invoiceNumber: true, customerName: true, invoiceDate: true } }),
+      prisma.expense.groupBy({ by: ["category"], where: { expenseDate: { gte: from, lt: end } }, _sum: { amount: true } }),
+      prisma.invoice.findMany({ where: finalized, select: { totalAmount: true, paidAmount: true } }),
+      prisma.customerPayment.findMany({ where: { paymentDate: { gte: from, lt: end }, reversedAt: null, invoice: { status: { notIn: ["DRAFT", "CANCELLED"] } } }, select: { amount: true, paymentMethod: true } }),
+      prisma.purchase.aggregate({ _sum: { totalAmount: true } }),
+      prisma.supplierPayment.aggregate({ _sum: { amount: true } }),
+      prisma.ledger.findMany({ where: { entryDate: { gte: from, lt: end } }, orderBy: { entryDate: "desc" }, take: 12, include: { customer: { select: { name: true } } } }),
     ]);
 
-    const totalSales = salesData.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-    const cashSales = salesData.filter((invoice) => invoice.paymentType === "CASH").reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-    const upiSales = salesData.filter((invoice) => invoice.paymentType === "UPI").reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-    const creditSales = salesData.filter((invoice) => invoice.paymentType === "CREDIT").reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-    const totalExpenses = expenseData.reduce((sum, item) => sum + (item._sum.amount ?? 0), 0);
-    const totalReceivables = customerSummary._sum.outstandingAmount ?? 0;
-    const totalPurchases = purchaseSummary._sum.totalAmount ?? 0;
-    const totalSupplierPayments = supplierPayments._sum.amount ?? 0;
-    const totalPayables = Math.max(0, totalPurchases - totalSupplierPayments);
-    const netProfit = totalSales - totalExpenses;
-    const grossMargin = totalSales > 0 ? (netProfit / totalSales) * 100 : 0;
+    const totalSales = sales.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
+    const totalCollections = receipts.reduce((sum, payment) => sum + payment.amount, 0);
+    const cashCollections = receipts.filter((payment) => payment.paymentMethod === "CASH").reduce((sum, payment) => sum + payment.amount, 0);
+    const upiCollections = receipts.filter((payment) => payment.paymentMethod === "UPI").reduce((sum, payment) => sum + payment.amount, 0);
+    const periodReceivables = sales.reduce((sum, invoice) => sum + Math.max(0, invoice.totalAmount - invoice.paidAmount), 0);
+    const totalReceivables = allInvoices.reduce((sum, invoice) => sum + Math.max(0, invoice.totalAmount - invoice.paidAmount), 0);
+    const totalExpenses = expenses.reduce((sum, item) => sum + (item._sum.amount ?? 0), 0);
+    const totalPayables = Math.max(0, (allPurchases._sum.totalAmount ?? 0) - (allSupplierPayments._sum.amount ?? 0));
 
     return NextResponse.json({
-      period: {
-        from: from.toISOString(),
-        to: to.toISOString(),
-      },
-      summary: {
-        totalSales,
-        totalExpenses,
-        netProfit,
-        totalReceivables,
-        totalPayables,
-        grossMargin,
-        cashFlow: totalSales - totalExpenses,
-      },
-      salesBreakdown: {
-        cashSales,
-        upiSales,
-        creditSales,
-      },
-      expenseBreakdown: expenseData.map((item) => ({
-        category: item.category,
-        amount: item._sum.amount ?? 0,
-      })),
-      recentLedger: recentLedger.map((entry) => ({
-        id: entry.id,
-        date: entry.entryDate,
-        description: entry.description,
-        type: entry.ledgerType,
-        amount: entry.debit > 0 ? entry.debit : entry.credit,
-        balance: entry.balance,
-        customer: entry.customer?.name ?? "System",
-      })),
+      period: { from: from.toISOString(), to: new Date(endExclusive - 1).toISOString() },
+      summary: { totalSales, totalCollections, totalExpenses, totalReceivables, totalPayables, periodReceivables, collectionsMinusExpenses: totalCollections - totalExpenses },
+      salesBreakdown: { cashCollections, upiCollections, periodReceivables },
+      expenseBreakdown: expenses.map((item) => ({ category: item.category, amount: item._sum.amount ?? 0 })),
+      recentLedger: ledger.map((entry) => ({ id: entry.id, date: entry.entryDate, description: entry.description, type: entry.ledgerType, amount: entry.debit > 0 ? entry.debit : entry.credit, balance: entry.balance, customer: entry.customer?.name ?? "Walk-in / System" })),
     });
-  } catch {
+  } catch (error) {
+    console.error("GET /api/reports/accounting failed", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

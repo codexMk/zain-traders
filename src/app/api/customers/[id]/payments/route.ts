@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { requireRole } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { invoiceStatusFromPayments } from "@/lib/reconciliation";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -19,7 +20,7 @@ async function recalculateCustomerOutstanding(
   customerId: string,
 ) {
   const invoiceTotals = await tx.invoice.findMany({
-    where: { customerId },
+    where: { customerId, status: { not: "CANCELLED" } },
     select: { totalAmount: true, paidAmount: true },
   });
 
@@ -63,6 +64,10 @@ export async function POST(
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
+    if (invoice.status === "DRAFT" || invoice.status === "CANCELLED") {
+      return NextResponse.json({ error: "Payments can only be applied to finalized active invoices" }, { status: 400 });
+    }
+
     if (invoice.customerId !== id) {
       return NextResponse.json({ error: "Invoice does not belong to this customer" }, { status: 400 });
     }
@@ -75,7 +80,8 @@ export async function POST(
       return NextResponse.json(existingByKey, { status: 200 });
     }
 
-    const currentPaid = invoice.payments.reduce((sum, payment) => sum + payment.amount, 0);
+    const recordedPaid = invoice.payments.filter((payment) => !payment.reversedAt).reduce((sum, payment) => sum + payment.amount, 0);
+    const currentPaid = Math.max(invoice.paidAmount, recordedPaid);
     const outstandingAfterPayment = Math.max(0, invoice.totalAmount - currentPaid);
 
     if (data.amount > outstandingAfterPayment) {
@@ -86,6 +92,11 @@ export async function POST(
     }
 
     const payment = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Invoice" WHERE "id" = ${invoice.id} FOR UPDATE`;
+      const lockedInvoice = await tx.invoice.findUnique({ where: { id: invoice.id } });
+      if (!lockedInvoice || lockedInvoice.status === "DRAFT" || lockedInvoice.status === "CANCELLED") {
+        throw new Error("Invoice is no longer available for payment");
+      }
       const existing = await tx.customerPayment.findUnique({
         where: { idempotencyKey },
       });
@@ -107,8 +118,12 @@ export async function POST(
         },
       });
 
-      const nextPaidAmount = currentPaid + data.amount;
-      const nextStatus = nextPaidAmount >= invoice.totalAmount ? "PAID" : "PARTIALLY_PAID";
+      const activePayments = await tx.customerPayment.findMany({ where: { invoiceId: invoice.id, reversedAt: null }, select: { amount: true } });
+      const activePaid = activePayments.reduce((sum, payment) => sum + payment.amount, 0);
+      const openingPaid = Math.max(0, lockedInvoice.paidAmount - activePaid);
+      const nextPaidAmount = openingPaid + activePaid + data.amount;
+      if (nextPaidAmount > lockedInvoice.totalAmount) throw new Error("Payment exceeds the remaining invoice balance");
+      const nextStatus = invoiceStatusFromPayments(lockedInvoice.totalAmount, nextPaidAmount);
 
       await tx.invoice.update({
         where: { id: invoice.id },

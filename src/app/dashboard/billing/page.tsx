@@ -12,9 +12,11 @@ interface Invoice {
   invoiceNumber: string;
   customerName: string;
   total: number;
+  paidAmount: number;
+  balanceDue: number;
   status: string;
   paymentType: string;
-  createdAt: string;
+  invoiceDate: string;
 }
 
 export default function BillingPage() {
@@ -37,7 +39,7 @@ export default function BillingPage() {
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete invoice? Stock will be restored.")) return;
+    if (!confirm("Cancel this invoice? Stock movements and cancellation history will be retained.")) return;
     const res = await fetch(`/api/invoices/${id}`, { method: "DELETE" });
     if (res.ok) fetchInvoices();
   };
@@ -60,6 +62,7 @@ export default function BillingPage() {
       SENT: "bg-blue-100 text-blue-800",
       DRAFT: "bg-gray-100 text-gray-800",
       PARTIALLY_PAID: "bg-yellow-100 text-yellow-800",
+      CANCELLED: "bg-red-100 text-red-800",
     };
     return colors[status] ?? "bg-gray-100 text-gray-800";
   };
@@ -76,7 +79,7 @@ export default function BillingPage() {
           className="flex items-center gap-2 bg-brand-gold hover:opacity-90 text-brand-charcoal px-6 py-3 rounded-2xl font-bold text-lg transition"
         >
           <Plus size={22} />
-          New Invoice
+          New Bill
         </Link>
       </div>
 
@@ -107,6 +110,7 @@ export default function BillingPage() {
                   <th className="px-6 py-4 text-left text-sm font-semibold">Invoice #</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">Customer</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">Amount</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold">Received / Due</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">Payment</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">Date</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">Status</th>
@@ -119,9 +123,10 @@ export default function BillingPage() {
                     <td className="px-6 py-4 font-medium">{invoice.invoiceNumber}</td>
                     <td className="px-6 py-4 text-sm">{invoice.customerName}</td>
                     <td className="px-6 py-4 font-semibold">{formatCurrency(invoice.total)}</td>
+                    <td className="px-6 py-4 text-xs"><span>Received {formatCurrency(invoice.paidAmount)}</span><br /><span className="text-brand-muted">Due {formatCurrency(invoice.balanceDue)}</span></td>
                     <td className="px-6 py-4 text-sm">{invoice.paymentType}</td>
                     <td className="px-6 py-4 text-sm">
-                      {new Date(invoice.createdAt).toLocaleDateString("en-IN")}
+                      {new Date(invoice.invoiceDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(invoice.status)}`}>
@@ -136,7 +141,7 @@ export default function BillingPage() {
                         <button onClick={() => handleDuplicate(invoice.id)} className="text-brand-gold hover:opacity-70">
                           <Copy size={20} />
                         </button>
-                        {canDelete && (
+                        {canDelete && invoice.status !== "CANCELLED" && (
                           <button onClick={() => handleDelete(invoice.id)} className="text-red-600 hover:opacity-70">
                             <Trash2 size={20} />
                           </button>

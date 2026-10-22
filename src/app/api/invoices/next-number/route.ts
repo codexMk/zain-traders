@@ -1,5 +1,5 @@
 import { requireAuth } from "@/lib/auth-helpers";
-import { generateInvoiceNumber } from "@/lib/invoice-utils";
+import { generateInvoiceNumber } from "@/lib/invoice-number";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {

@@ -2,6 +2,8 @@
 
 import { Bell, Building2, ShieldCheck, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { FormEvent, useEffect, useState } from "react";
+import { businessInfo } from "@/lib/business-info";
 
 const settingsSections = [
   {
@@ -60,6 +62,7 @@ export default function SettingsPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-5">
+          <BusinessInvoiceSettings canEdit={role === "OWNER"} />
           {settingsSections.map(({ title, icon: Icon, items }) => (
             <div key={title} className="rounded-2xl border border-brand-emerald/10 bg-white p-5 shadow-sm">
               <div className="mb-4 flex items-center gap-2">
@@ -121,5 +124,71 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+const indianStates = [
+  ["01", "Jammu and Kashmir"], ["02", "Himachal Pradesh"], ["03", "Punjab"], ["04", "Chandigarh"],
+  ["05", "Uttarakhand"], ["06", "Haryana"], ["07", "Delhi"], ["08", "Rajasthan"], ["09", "Uttar Pradesh"],
+  ["10", "Bihar"], ["11", "Sikkim"], ["12", "Arunachal Pradesh"], ["13", "Nagaland"], ["14", "Manipur"],
+  ["15", "Mizoram"], ["16", "Tripura"], ["17", "Meghalaya"], ["18", "Assam"], ["19", "West Bengal"],
+  ["20", "Jharkhand"], ["21", "Odisha"], ["22", "Chhattisgarh"], ["23", "Madhya Pradesh"], ["24", "Gujarat"],
+  ["26", "Dadra and Nagar Haveli and Daman and Diu"], ["27", "Maharashtra"], ["28", "Andhra Pradesh"],
+  ["29", "Karnataka"], ["30", "Goa"], ["31", "Lakshadweep"], ["32", "Kerala"], ["33", "Tamil Nadu"],
+  ["34", "Puducherry"], ["35", "Andaman and Nicobar Islands"], ["36", "Telangana"], ["37", "Andhra Pradesh"],
+  ["38", "Ladakh"],
+] as const;
+
+function BusinessInvoiceSettings({ canEdit }: { canEdit: boolean }) {
+  const [legalName, setLegalName] = useState<string>(businessInfo.nameEnglish);
+  const [address, setAddress] = useState<string>(businessInfo.address);
+  const [phonesText, setPhonesText] = useState(businessInfo.phones.join("\n"));
+  const [gstin, setGstin] = useState("");
+  const [stateCode, setStateCode] = useState("");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/settings/business")
+      .then((response) => response.json())
+      .then((data) => {
+        setLegalName(data.legalName ?? businessInfo.nameEnglish);
+        setAddress(data.address ?? businessInfo.address);
+        setPhonesText((data.phoneNumbers ?? businessInfo.phones).join("\n"));
+        setGstin(data.gstin ?? "");
+        setStateCode(data.registeredStateCode ?? "");
+      })
+      .catch(() => setMessage("Business tax configuration could not be loaded"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    setMessage("");
+    const response = await fetch("/api/settings/business", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ legalName, address, phoneNumbers: phonesText.split("\n").map((phone) => phone.trim()).filter(Boolean), gstin: gstin || null, registeredStateCode: stateCode || null }),
+    });
+    const result = await response.json();
+    setMessage(response.ok ? "Invoice details saved" : result.error || "Could not save settings");
+  };
+
+  return (
+    <form onSubmit={save} className="rounded-2xl border border-brand-emerald/10 bg-white p-5 shadow-sm">
+      <h2 className="text-lg font-semibold text-brand-charcoal">Invoice business details</h2>
+      <p className="mb-4 mt-1 text-sm text-brand-muted">GST invoices require your registered GSTIN and state. These details are saved on each new invoice.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm font-medium">Legal business name<input required value={legalName} onChange={(e) => setLegalName(e.target.value)} disabled={!canEdit || loading} className="mt-1 w-full rounded-xl border px-3 py-2" /></label>
+        <label className="text-sm font-medium">Registered state<select value={stateCode} onChange={(e) => setStateCode(e.target.value)} disabled={!canEdit || loading} className="mt-1 w-full rounded-xl border bg-white px-3 py-2"><option value="">Select state</option>{indianStates.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></label>
+        <label className="text-sm font-medium sm:col-span-2">Supplier address<textarea required value={address} onChange={(e) => setAddress(e.target.value)} disabled={!canEdit || loading} rows={2} className="mt-1 w-full rounded-xl border px-3 py-2" /></label>
+        <label className="text-sm font-medium">Supplier GSTIN<input value={gstin} onChange={(e) => setGstin(e.target.value.toUpperCase())} disabled={!canEdit || loading} maxLength={15} className="mt-1 w-full rounded-xl border px-3 py-2 uppercase" placeholder="15-character GSTIN" /></label>
+        <label className="text-sm font-medium">Contact numbers<textarea value={phonesText} onChange={(e) => setPhonesText(e.target.value)} disabled={!canEdit || loading} rows={2} className="mt-1 w-full rounded-xl border px-3 py-2" /></label>
+      </div>
+      <div className="mt-4 flex items-center gap-3">
+        {canEdit && <button disabled={loading} className="rounded-xl bg-brand-emerald px-4 py-2 font-semibold text-white disabled:opacity-50">Save invoice details</button>}
+        <span role="status" className="text-sm text-brand-muted">{loading ? "Loading…" : message}</span>
+      </div>
+    </form>
   );
 }

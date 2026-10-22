@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search");
+    const customerId = searchParams.get("customerId");
 
     const products = await prisma.product.findMany({
       where: {
@@ -39,9 +40,47 @@ export async function GET(request: NextRequest) {
       },
       include: { category: true },
       orderBy: { name: "asc" },
+      take: search ? 20 : 500,
     });
 
-    return NextResponse.json(products);
+    const lastRates = new Map<string, number>();
+    const recentSales = await prisma.invoiceItem.findMany({
+      where: {
+        productId: { in: products.map((product) => product.id) },
+        invoice: {
+          status: { notIn: ["DRAFT", "CANCELLED"] },
+          ...(customerId ? { customerId } : {}),
+        },
+      },
+      orderBy: { invoice: { invoiceDate: "desc" } },
+      take: 50,
+      select: { productId: true, rate: true },
+    });
+    const recentIds: string[] = [];
+    for (const sale of recentSales) {
+      if (!sale.productId) continue;
+      if (customerId && !lastRates.has(sale.productId)) lastRates.set(sale.productId, sale.rate);
+      if (!recentIds.includes(sale.productId)) recentIds.push(sale.productId);
+    }
+    if (customerId) {
+      const sales = await prisma.invoiceItem.findMany({
+        where: {
+          productId: { in: products.map((product) => product.id) },
+          invoice: { customerId, status: { notIn: ["DRAFT", "CANCELLED"] } },
+        },
+        orderBy: { invoice: { invoiceDate: "desc" } },
+        select: { productId: true, rate: true },
+      });
+      for (const sale of sales) {
+        if (sale.productId && !lastRates.has(sale.productId)) lastRates.set(sale.productId, sale.rate);
+      }
+    }
+    const recentOrder = new Map(recentIds.map((id, index) => [id, index]));
+    products.sort((left, right) => (recentOrder.get(left.id) ?? 1_000) - (recentOrder.get(right.id) ?? 1_000));
+    return NextResponse.json(products.map((product) => ({
+      ...product,
+      lastSellingRate: lastRates.get(product.id) ?? null,
+    })));
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

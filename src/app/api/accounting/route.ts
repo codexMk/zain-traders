@@ -13,42 +13,45 @@ export async function GET(request: NextRequest) {
     if (session instanceof NextResponse) return session;
 
     const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const indiaToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(now);
+    const monthKey = `${indiaToday.slice(0, 7)}-01`;
+    const monthStart = new Date(`${monthKey}T00:00:00+05:30`);
+    const nextMonth = new Date(`${monthKey}T00:00:00+05:30`);
+    nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
 
     const [
       salesData,
       expenseData,
-      totalReceivables,
+      allReceivableInvoices,
       purchaseAggregate,
       ledgerEntries,
       openInvoices,
       suppliersWithPurchases,
+      monthlyPayments,
     ] = await Promise.all([
       prisma.invoice.findMany({
         where: {
-          invoiceDate: { gte: monthStart },
-          status: { not: "DRAFT" },
+          invoiceDate: { gte: monthStart, lt: nextMonth },
+          status: { notIn: ["DRAFT", "CANCELLED"] },
         },
         select: {
           totalAmount: true,
           paidAmount: true,
-          paymentType: true,
           invoiceDate: true,
         },
       }),
       prisma.expense.groupBy({
         by: ["category"],
         where: {
-          expenseDate: { gte: monthStart },
+          expenseDate: { gte: monthStart, lt: nextMonth },
         },
         _sum: {
           amount: true,
         },
       }),
-      prisma.customer.aggregate({
-        _sum: {
-          outstandingAmount: true,
-        },
+      prisma.invoice.findMany({
+        where: { status: { notIn: ["DRAFT", "CANCELLED"] } },
+        select: { totalAmount: true, paidAmount: true },
       }),
       prisma.purchase.aggregate({
         _sum: {
@@ -57,13 +60,13 @@ export async function GET(request: NextRequest) {
       }),
       prisma.ledger.findMany({
         orderBy: { entryDate: "desc" },
-        take: 8,
+          take: 8,
         include: {
           customer: { select: { name: true } },
         },
       }),
       prisma.invoice.findMany({
-        where: { status: { not: "DRAFT" } },
+        where: { status: { notIn: ["DRAFT", "CANCELLED"] } },
         select: {
           id: true,
           invoiceNumber: true,
@@ -72,10 +75,11 @@ export async function GET(request: NextRequest) {
           totalAmount: true,
           paidAmount: true,
           status: true,
-          customer: { select: { id: true, name: true, mobile: true } },
+          customerId: true,
+          customerName: true,
+          customerMobile: true,
         },
         orderBy: { invoiceDate: "desc" },
-        take: 200,
       }),
       prisma.supplier.findMany({
         where: { isActive: true },
@@ -93,30 +97,28 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        orderBy: { name: "asc" },
+          orderBy: { name: "asc" },
+      }),
+      prisma.customerPayment.findMany({
+        where: { paymentDate: { gte: monthStart, lt: nextMonth }, reversedAt: null, invoice: { status: { notIn: ["DRAFT", "CANCELLED"] } } },
+        select: { amount: true, paymentMethod: true },
       }),
     ]);
 
     const totalSales = salesData.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-    const cashSales = salesData
-      .filter((invoice) => invoice.paymentType === "CASH")
-      .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-    const upiSales = salesData
-      .filter((invoice) => invoice.paymentType === "UPI")
-      .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-    const creditSales = salesData
-      .filter((invoice) => invoice.paymentType === "CREDIT")
-      .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
+    const cashSales = monthlyPayments.filter((payment) => payment.paymentMethod === "CASH").reduce((sum, payment) => sum + payment.amount, 0);
+    const upiSales = monthlyPayments.filter((payment) => payment.paymentMethod === "UPI").reduce((sum, payment) => sum + payment.amount, 0);
+    const creditSales = salesData.reduce((sum, invoice) => sum + Math.max(0, invoice.totalAmount - invoice.paidAmount), 0);
+    const totalCollections = monthlyPayments.reduce((sum, payment) => sum + payment.amount, 0);
 
     const totalExpenses = expenseData.reduce((sum, item) => sum + (item._sum.amount ?? 0), 0);
-    const totalOutstanding = totalReceivables._sum.outstandingAmount ?? 0;
+    const totalOutstanding = allReceivableInvoices.reduce((sum, invoice) => sum + Math.max(0, invoice.totalAmount - invoice.paidAmount), 0);
     const totalPurchases = purchaseAggregate._sum.totalAmount ?? 0;
     const totalSupplierPayments = await prisma.supplierPayment.aggregate({
       _sum: { amount: true },
     });
     const calculatedPayables = Math.max(0, totalPurchases - (totalSupplierPayments._sum.amount ?? 0));
-    const netCashFlow = totalSales - totalExpenses;
-    const grossMargin = totalSales > 0 ? ((totalSales - totalExpenses) / totalSales) * 100 : 0;
+    const collectionsLessExpenses = totalCollections - totalExpenses;
 
     const expenseBreakdown = expenseData.map((item) => ({
       category: item.category,
@@ -154,9 +156,9 @@ export async function GET(request: NextRequest) {
       return {
         id: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
-        customerId: invoice.customer.id,
-        customerName: invoice.customer.name,
-        customerMobile: invoice.customer.mobile,
+        customerId: invoice.customerId,
+        customerName: invoice.customerName || "Walk-in Customer",
+        customerMobile: invoice.customerMobile || "",
         invoiceDate: invoice.invoiceDate,
         dueDate: invoice.dueDate,
         totalAmount: invoice.totalAmount,
@@ -185,7 +187,7 @@ export async function GET(request: NextRequest) {
     >();
 
     for (const line of receivableLines) {
-      if (line.remaining <= 0) continue;
+      if (line.remaining <= 0 || !line.customerId) continue;
       const existing = customerMap.get(line.customerId) ?? {
         id: line.customerId,
         name: line.customerName,
@@ -232,14 +234,14 @@ export async function GET(request: NextRequest) {
       summary: {
         receivables: totalOutstanding,
         payables: calculatedPayables,
-        cashFlow: netCashFlow,
-        grossMargin,
+        collectionsLessExpenses,
       },
       sales: {
         totalSales,
-        cashSales,
-        upiSales,
-        creditSales,
+        totalCollections,
+        cashCollections: cashSales,
+        upiCollections: upiSales,
+        receivableFromMonthSales: creditSales,
       },
       expenses: {
         totalExpenses,

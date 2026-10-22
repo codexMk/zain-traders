@@ -7,22 +7,21 @@ import {
   IndianRupee,
   Landmark,
   ReceiptText,
-  TrendingUp,
   Wallet,
 } from "lucide-react";
 
 interface AccountingSummary {
   receivables: number;
   payables: number;
-  cashFlow: number;
-  grossMargin: number;
+  collectionsLessExpenses: number;
 }
 
 interface AccountingSales {
   totalSales: number;
-  cashSales: number;
-  upiSales: number;
-  creditSales: number;
+  totalCollections: number;
+  cashCollections: number;
+  upiCollections: number;
+  receivableFromMonthSales: number;
 }
 
 interface ExpenseBreakdownItem {
@@ -341,20 +340,12 @@ export default function AccountingPage() {
           bg: "bg-amber-50",
         },
         {
-          label: "Cash Flow",
-          value: formatCurrency(summary.cashFlow),
-          change: "This month net movement",
+          label: "Collections less expenses",
+          value: formatCurrency(summary.collectionsLessExpenses),
+          change: "Recorded receipts less operating expenses",
           tone: "text-brand-emerald",
           icon: Wallet,
           bg: "bg-brand-cream",
-        },
-        {
-          label: "Gross Margin",
-          value: `${summary.grossMargin.toFixed(1)}%`,
-          change: "After operating expenses",
-          tone: "text-brand-gold",
-          icon: TrendingUp,
-          bg: "bg-yellow-50",
         },
       ]
     : [];
@@ -916,8 +907,8 @@ export default function AccountingPage() {
           {sales && (
             <div className="rounded-2xl border border-brand-emerald/10 bg-brand-emerald p-5 text-white shadow-sm">
               <p className="text-sm text-white/80">This month</p>
-              <p className="mt-3 text-3xl font-bold">{formatCurrency(sales.totalSales - (expenses?.totalExpenses ?? 0))}</p>
-              <p className="mt-2 text-sm text-white/80">Net cash after expenses</p>
+              <p className="mt-3 text-3xl font-bold">{formatCurrency(sales.totalCollections - (expenses?.totalExpenses ?? 0))}</p>
+              <p className="mt-2 text-sm text-white/80">Recorded collections less operating expenses</p>
             </div>
           )}
         </div>

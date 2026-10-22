@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react";
 import { permissions } from "@/lib/permissions";
 
 type ReportType = "daily" | "products" | "outstanding" | "inventory" | "accounting" | "gst";
+const todayIndia = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
 
 export default function ReportsPanel() {
   const { data: session } = useSession();
@@ -16,12 +17,11 @@ export default function ReportsPanel() {
   const [activeReport, setActiveReport] = useState<ReportType>("daily");
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<unknown>(null);
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(todayIndia());
   const [gstFrom, setGstFrom] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+    return `${todayIndia().slice(0, 7)}-01`;
   });
-  const [gstTo, setGstTo] = useState(new Date().toISOString().split("T")[0]);
+  const [gstTo, setGstTo] = useState(todayIndia());
 
   const reports = [
     { id: "daily" as const, label: "Daily Sales", icon: FileText },
@@ -38,9 +38,9 @@ export default function ReportsPanel() {
 
     const urls: Record<ReportType, string> = {
       daily: `/api/reports/daily-sales?date=${date}`,
-      accounting: "/api/reports/accounting",
+      accounting: `/api/reports/accounting?from=${gstFrom}&to=${gstTo}`,
       gst: `/api/reports/gst?from=${gstFrom}&to=${gstTo}`,
-      products: "/api/reports/product-sales",
+      products: `/api/reports/product-sales?from=${gstFrom}&to=${gstTo}`,
       outstanding: "/api/reports/customer-outstanding",
       inventory: "/api/reports/inventory",
     };
@@ -67,14 +67,15 @@ export default function ReportsPanel() {
       exportToExcelCompatibleCsv("daily-sales-report", ["Invoice", "Customer", "Amount", "Payment", "Status"], data.invoices.map((i) => [i.invoiceNumber, i.customer, i.totalAmount, i.paymentType, i.status]));
     } else if (activeReport === "accounting") {
       const data = reportData as {
-        summary: { totalSales: number; totalExpenses: number; totalReceivables: number; totalPayables: number; netProfit: number };
+        summary: { totalSales: number; totalCollections: number; totalExpenses: number; totalReceivables: number; totalPayables: number; collectionsMinusExpenses: number };
         expenseBreakdown: { category: string; amount: number }[];
       };
       const rows = [
         ["Metric", "Value"],
         ["Sales", data.summary.totalSales],
         ["Expenses", data.summary.totalExpenses],
-        ["Net Profit", data.summary.netProfit],
+        ["Collections", data.summary.totalCollections],
+        ["Collections less expenses", data.summary.collectionsMinusExpenses],
         ["Receivables", data.summary.totalReceivables],
         ["Payables", data.summary.totalPayables],
       ];
@@ -191,6 +192,13 @@ export default function ReportsPanel() {
         </div>
       )}
 
+      {(activeReport === "accounting" || activeReport === "products") && (
+        <div className="flex flex-wrap items-end gap-4 rounded-2xl border border-brand-emerald/10 bg-white p-4">
+          <label className="text-sm text-brand-muted">From<input type="date" value={gstFrom} onChange={(e) => setGstFrom(e.target.value)} className="mt-1 block rounded-xl border px-4 py-2 text-brand-charcoal" /></label>
+          <label className="text-sm text-brand-muted">To<input type="date" value={gstTo} onChange={(e) => setGstTo(e.target.value)} className="mt-1 block rounded-xl border px-4 py-2 text-brand-charcoal" /></label>
+        </div>
+      )}
+
       <div className="flex gap-3">
         <button
           onClick={() => fetchReport(activeReport)}
@@ -236,7 +244,7 @@ export default function ReportsPanel() {
 }
 
 interface DailySalesData {
-  summary: { invoiceCount: number; totalSales: number; cashSales: number; upiSales: number; creditSales: number };
+  summary: { invoiceCount: number; totalSales: number; cashCollections: number; upiCollections: number; outstandingReceivable: number };
   invoices: { invoiceNumber: string; customer: string; totalAmount: number; paymentType: string; status: string }[];
 }
 
@@ -246,8 +254,8 @@ function DailySalesView({ data, canViewProfit }: { data: DailySalesData; canView
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Stat label="Invoices" value={String(data.summary.invoiceCount)} />
         {canViewProfit && <Stat label="Total Sales" value={formatCurrency(data.summary.totalSales)} />}
-        <Stat label="Cash" value={formatCurrency(data.summary.cashSales)} />
-        <Stat label="UPI" value={formatCurrency(data.summary.upiSales)} />
+        <Stat label="Cash collected" value={formatCurrency(data.summary.cashCollections)} />
+        <Stat label="UPI collected" value={formatCurrency(data.summary.upiCollections)} />
       </div>
       <table className="w-full text-sm">
         <thead><tr className="bg-brand-cream"><th className="p-2 text-left">Invoice</th><th className="p-2 text-left">Customer</th><th className="p-2 text-right">Amount</th><th className="p-2">Payment</th></tr></thead>
@@ -264,14 +272,13 @@ function DailySalesView({ data, canViewProfit }: { data: DailySalesData; canView
 interface AccountingOverviewData {
   summary: {
     totalSales: number;
+    totalCollections: number;
     totalExpenses: number;
-    netProfit: number;
     totalReceivables: number;
     totalPayables: number;
-    grossMargin: number;
-    cashFlow: number;
+    collectionsMinusExpenses: number;
   };
-  salesBreakdown: { cashSales: number; upiSales: number; creditSales: number };
+  salesBreakdown: { cashCollections: number; upiCollections: number; periodReceivables: number };
   expenseBreakdown: { category: string; amount: number }[];
   recentLedger: { description: string; amount: number; type: string; balance: number }[];
 }
@@ -281,15 +288,15 @@ function AccountingOverviewView({ data }: { data: AccountingOverviewData }) {
     <div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Stat label="Sales" value={formatCurrency(data.summary.totalSales)} />
+        <Stat label="Payments received" value={formatCurrency(data.summary.totalCollections)} />
         <Stat label="Expenses" value={formatCurrency(data.summary.totalExpenses)} />
-        <Stat label="Net Profit" value={formatCurrency(data.summary.netProfit)} />
-        <Stat label="Gross Margin" value={`${data.summary.grossMargin.toFixed(1)}%`} />
+        <Stat label="Collections less expenses" value={formatCurrency(data.summary.collectionsMinusExpenses)} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Stat label="Cash Sales" value={formatCurrency(data.salesBreakdown.cashSales)} />
-        <Stat label="UPI Sales" value={formatCurrency(data.salesBreakdown.upiSales)} />
-        <Stat label="Credit Sales" value={formatCurrency(data.salesBreakdown.creditSales)} />
+        <Stat label="Cash collected" value={formatCurrency(data.salesBreakdown.cashCollections)} />
+        <Stat label="UPI collected" value={formatCurrency(data.salesBreakdown.upiCollections)} />
+        <Stat label="Receivable from range" value={formatCurrency(data.salesBreakdown.periodReceivables)} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -311,7 +318,7 @@ function AccountingOverviewView({ data }: { data: AccountingOverviewData }) {
             <tbody>
               <tr className="border-b"><td className="p-2">Receivables</td><td className="p-2 text-right">{formatCurrency(data.summary.totalReceivables)}</td></tr>
               <tr className="border-b"><td className="p-2">Payables</td><td className="p-2 text-right">{formatCurrency(data.summary.totalPayables)}</td></tr>
-              <tr className="border-b"><td className="p-2">Cash Flow</td><td className="p-2 text-right">{formatCurrency(data.summary.cashFlow)}</td></tr>
+              <tr className="border-b"><td className="p-2">Collections less expenses</td><td className="p-2 text-right">{formatCurrency(data.summary.collectionsMinusExpenses)}</td></tr>
             </tbody>
           </table>
         </div>
@@ -329,9 +336,9 @@ interface GSTReportData {
     totalPurchases: number;
     inputTax: number;
     netTaxLiability: number;
-    cashSales: number;
-    upiSales: number;
-    creditSales: number;
+    cashCollections: number;
+    upiCollections: number;
+    outstandingSales: number;
   };
   invoiceBreakdown: { invoiceNumber: string; customer: string; type: string; taxableAmount: number; gstAmount: number; totalAmount: number }[];
   purchaseBreakdown: { invoiceNumber: string; supplier: string; taxableAmount: number; gstAmount: number; totalAmount: number }[];
@@ -353,7 +360,7 @@ function GSTView({ data }: { data: GSTReportData }) {
             <GstMetric label="Gross sales" value={formatCurrency(data.summary.totalSales)} />
             <GstMetric label="Taxable value" value={formatCurrency(data.summary.taxableSales)} />
             <GstMetric label="GST collected" value={formatCurrency(data.summary.gstCollected)} highlight />
-            <GstMetric label="Credit sales" value={formatCurrency(data.summary.creditSales)} />
+            <GstMetric label="Receivable from selected sales" value={formatCurrency(data.summary.outstandingSales)} />
           </div>
         </div>
 
@@ -362,8 +369,8 @@ function GSTView({ data }: { data: GSTReportData }) {
           <div className="mt-4 grid grid-cols-2 gap-3">
             <GstMetric label="Purchase total" value={formatCurrency(data.summary.totalPurchases)} />
             <GstMetric label="Input tax credit" value={formatCurrency(data.summary.inputTax)} highlight />
-            <GstMetric label="Cash sales" value={formatCurrency(data.summary.cashSales)} />
-            <GstMetric label="UPI sales" value={formatCurrency(data.summary.upiSales)} />
+            <GstMetric label="Cash collected" value={formatCurrency(data.summary.cashCollections)} />
+            <GstMetric label="UPI collected" value={formatCurrency(data.summary.upiCollections)} />
           </div>
         </div>
       </div>

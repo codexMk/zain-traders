@@ -6,6 +6,12 @@ export function invoiceRemaining(totalAmount: number, paidAmount: number) {
   return Math.max(0, totalAmount - paidAmount);
 }
 
+export function invoiceStatusFromPayments(totalAmount: number, paidAmount: number) {
+  if (paidAmount > 0 && paidAmount >= totalAmount) return "PAID" as const;
+  if (paidAmount > 0) return "PARTIALLY_PAID" as const;
+  return "SENT" as const;
+}
+
 export function classifyInvoiceBucket(
   totalAmount: number,
   paidAmount: number,

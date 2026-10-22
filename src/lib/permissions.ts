@@ -2,6 +2,7 @@ export type AppRole = "OWNER" | "STAFF" | "ACCOUNTANT";
 
 export const permissions = {
   canEditProducts: (role: AppRole) => role === "OWNER",
+  canOverrideInvoiceRate: (role: AppRole) => role === "OWNER",
   canManageStock: (role: AppRole) => role === "OWNER",
   canViewProfitReports: (role: AppRole) => role === "OWNER" || role === "ACCOUNTANT",
   canDeleteInvoices: (role: AppRole) => role === "OWNER",

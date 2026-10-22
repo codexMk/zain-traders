@@ -113,7 +113,7 @@ img {
 
 @media print {
   @page {
-    margin: 0;
+    margin: 10mm;
     size: A4;
   }
 
@@ -128,10 +128,13 @@ img {
     margin: 0 !important;
   }
 
+  body * {
+    visibility: hidden !important;
+  }
+
   .dashboard-sidebar,
   .dashboard-header,
-  .dashboard-content > div:first-child > .flex-wrap.items-center.justify-between.gap-4.mb-6,
-  .dashboard-content > div:first-child > .flex-wrap.items-center.justify-between.gap-4.mb-6 ~ * {
+  .print\:hidden {
     display: none !important;
   }
 
@@ -148,19 +151,91 @@ img {
     padding: 0 !important;
   }
 
-  #invoice-print {
+  .dashboard-content > div:first-child {
+    visibility: hidden !important;
+  }
+
+  .invoice-document,
+  .invoice-document * {
+    color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    visibility: visible !important;
+  }
+
+  #invoice-a4,
+  #invoice-thermal {
+    display: none !important;
+  }
+
+  html[data-print-format="A4"] #invoice-a4 {
+    display: block !important;
     width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
+    padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
-    border-radius: 0 !important;
     overflow: visible !important;
+    page: invoice-a4;
   }
 
-  #invoice-print * {
-    color-adjust: exact;
-    -webkit-print-color-adjust: exact;
+  html[data-print-format="A4"] #invoice-a4 .invoice-table thead {
+    display: table-header-group;
+  }
+
+  html[data-print-format="A4"] #invoice-a4 .invoice-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  html[data-print-format="THERMAL_58"] #invoice-thermal,
+  html[data-print-format="THERMAL_80"] #invoice-thermal {
+    display: block !important;
+    margin: 0 !important;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    font-size: 9pt !important;
+  }
+
+  html[data-print-format="THERMAL_58"] #invoice-thermal {
+    width: 54mm !important;
+    max-width: 54mm !important;
+    page: receipt-58;
+  }
+
+  html[data-print-format="THERMAL_80"] #invoice-thermal {
+    width: 76mm !important;
+    max-width: 76mm !important;
+    page: receipt-80;
+  }
+
+  .thermal-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2mm;
+    align-items: start;
+  }
+
+  .thermal-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page invoice-a4 {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  @page receipt-58 {
+    size: 58mm auto;
+    margin: 2mm;
+  }
+
+  @page receipt-80 {
+    size: 80mm auto;
+    margin: 2mm;
   }
 }
 
