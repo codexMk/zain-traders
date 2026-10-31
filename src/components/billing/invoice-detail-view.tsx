@@ -206,16 +206,118 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
       </div>
       {error && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 print:hidden">{error}</div>}
 
-      <article id="invoice-a4" className="invoice-document invoice-a4 mx-auto max-w-[210mm] bg-white p-8 shadow-lg print:shadow-none">
-        <header className="border-b-2 border-emerald-900 pb-4">
-          <div className="flex items-start justify-between gap-4"><div><p className="text-2xl font-bold text-emerald-950">{invoice.supplierName || businessInfo.nameEnglish} <span className="text-base">/ ज़ैन ट्रेडर्स</span></p><p className="mt-1 text-sm text-gray-600">Wholesale spices and dry fruits</p><p className="mt-2 max-w-lg text-sm">{invoice.supplierAddress || businessInfo.address}</p><p className="text-sm">{invoice.supplierPhones.length ? invoice.supplierPhones.join(" · ") : businessInfo.phones.join(" · ")}</p>{invoice.supplierGstin && <p className="mt-1 text-sm font-semibold">GSTIN: {invoice.supplierGstin}</p>}</div><div className="text-right"><p className="text-xl font-bold text-emerald-900">{invoice.gstEnabled ? "TAX INVOICE" : "BILL"}</p><p className="mt-2 text-sm">Invoice No: <b>{invoice.invoiceNumber}</b></p><p className="text-sm">Date: {fmtDate(invoice.invoiceDate)}</p>{invoice.placeOfSupplyStateCode && <p className="text-sm">Place of supply: {invoice.placeOfSupplyStateCode}</p>}<p className="mt-1 text-sm">Payment status: <b>{invoice.status}</b></p></div></div>
+      <article id="invoice-a4" className="invoice-document invoice-a4 mx-auto max-w-[210mm] border border-gray-500 bg-white p-5 text-gray-900 shadow-lg print:shadow-none">
+        <header className="grid grid-cols-[1fr_auto] items-start gap-5 border-b-2 border-brand-emerald pb-4">
+          <div>
+            <h1 className="text-2xl font-extrabold uppercase tracking-wide text-brand-emerald">{invoice.supplierName || businessInfo.nameEnglish}</h1>
+            <p className="mt-1 font-semibold">Wholesale Spices &amp; Dry Fruits</p>
+            <p className="mt-2 max-w-xl whitespace-pre-wrap text-xs">{invoice.supplierAddress || businessInfo.address}</p>
+            <p className="text-xs">Phone: {(invoice.supplierPhones.length ? invoice.supplierPhones : businessInfo.phones).join(" | ")}</p>
+            <p className="mt-1 text-xs font-semibold">GSTIN: {invoice.supplierGstin || businessInfo.gstin}</p>
+          </div>
+          <div className="min-w-44 text-right">
+            <h2 className="text-xl font-bold">{invoice.gstEnabled ? "TAX INVOICE" : "INVOICE"}</h2>
+            <p className="mt-2 text-sm">Invoice No: <b>{invoice.invoiceNumber}</b></p>
+            <p className="text-sm">Invoice Date: {fmtDate(invoice.invoiceDate)}</p>
+            {invoice.placeOfSupplyStateCode && <p className="text-sm">Place of Supply: {invoice.placeOfSupplyStateCode}</p>}
+            <p className="text-sm">Status: <b>{invoice.status}</b></p>
+          </div>
         </header>
-        <section className="my-5 grid grid-cols-2 gap-6 text-sm"><div><p className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-500">Bill to</p><p className="font-bold">{invoice.customerName || "Walk-in Customer"}</p>{invoice.customerMobile && <p>{invoice.customerMobile}</p>}{invoice.customerAddress && <p className="whitespace-pre-wrap">{invoice.customerAddress}</p>}{invoice.customerGstNumber && <p className="mt-1">GSTIN: {invoice.customerGstNumber}</p>}</div><div className="text-right"><p>Terms: {invoice.paymentType}</p>{invoice.deliveryBy && <p>Delivery by: {invoice.deliveryBy}</p>}</div></section>
-        <table className="invoice-table w-full border-collapse text-xs"><thead className="table-header-group"><tr className="border-y bg-gray-100"><th className="px-2 py-2 text-left">Description</th><th className="px-2 py-2 text-left">HSN/SAC</th><th className="px-2 py-2 text-right">Qty</th><th className="px-2 py-2 text-right">Rate</th><th className="px-2 py-2 text-right">Discount</th><th className="px-2 py-2 text-right">Taxable</th>{invoice.gstEnabled && <th className="px-2 py-2 text-right">GST</th>}<th className="px-2 py-2 text-right">Amount</th></tr></thead><tbody>{invoice.items.map((item, index) => <tr key={`${item.productSku}-${index}`} className="invoice-row border-b align-top"><td className="px-2 py-2">{item.productName || item.product?.name || "Item"}</td><td className="px-2 py-2">{item.hsnCode || "—"}</td><td className="px-2 py-2 text-right">{item.quantity} {item.unit}</td><td className="px-2 py-2 text-right">{formatCurrency(item.rate)}</td><td className="px-2 py-2 text-right">{formatCurrency(item.discountAmount)}</td><td className="px-2 py-2 text-right">{formatCurrency(item.taxableAmount)}</td>{invoice.gstEnabled && <td className="px-2 py-2 text-right">{item.gstPercent}%</td>}<td className="px-2 py-2 text-right font-semibold">{formatCurrency(item.amount)}</td></tr>)}</tbody></table>
-        <div className="mt-5 flex justify-end"><div className="w-72 space-y-1.5 text-sm"><div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(invoice.subtotal)}</span></div><div className="flex justify-between"><span>Discount</span><span>−{formatCurrency(invoice.discountAmount)}</span></div><div className="flex justify-between"><span>Taxable amount</span><span>{formatCurrency(invoice.taxableAmount)}</span></div>{invoice.gstEnabled && (taxSplitKnown ? invoice.igstAmount > 0 ? <div className="flex justify-between"><span>IGST</span><span>{formatCurrency(invoice.igstAmount)}</span></div> : <><div className="flex justify-between"><span>CGST</span><span>{formatCurrency(invoice.cgstAmount)}</span></div><div className="flex justify-between"><span>SGST</span><span>{formatCurrency(invoice.sgstAmount)}</span></div></> : <div className="flex justify-between"><span>GST</span><span>{formatCurrency(invoice.gstAmount)}</span></div>)}<div className="flex justify-between border-t border-gray-400 pt-2 text-lg font-bold"><span>Grand total</span><span>{formatCurrency(invoice.totalAmount)}</span></div><p className="pt-1 text-xs text-gray-600">Amount in words: {amountInWords(invoice.totalAmount)}</p><div className="flex justify-between"><span>Amount received</span><span>{formatCurrency(paidAmount)}</span></div><div className="flex justify-between font-semibold"><span>Balance due</span><span>{formatCurrency(due)}</span></div></div></div>
-        {invoice.notes && <p className="mt-5 text-sm">Notes: {invoice.notes}</p>}
-        {invoice.status === "CANCELLED" && <p className="mt-5 rounded border border-red-300 p-3 text-sm font-bold text-red-700">CANCELLED — {invoice.cancellationReason}</p>}
-        <footer className="mt-10 flex justify-between border-t pt-4 text-xs text-gray-500"><span>Authorized signature</span><span>Thank you for your business</span></footer>
+
+        <section className="my-4 grid grid-cols-2 border border-gray-400 text-xs">
+          <div className="border-r border-gray-400 p-3">
+            <p className="mb-2 bg-gray-100 px-2 py-1 font-bold uppercase">Customer Details</p>
+            <p className="font-bold">{invoice.customerName || "Walk-in Customer"}</p>
+            {invoice.customerMobile && <p>Phone: {invoice.customerMobile}</p>}
+            {invoice.customerAddress && <p className="whitespace-pre-wrap">Address: {invoice.customerAddress}</p>}
+            {invoice.customerGstNumber && <p>GSTIN: {invoice.customerGstNumber}</p>}
+          </div>
+          <div className="p-3">
+            <p className="mb-2 bg-gray-100 px-2 py-1 font-bold uppercase">Invoice Details</p>
+            <p>Payment terms: {invoice.paymentType}</p>
+            {invoice.deliveryBy && <p>Delivery by: {invoice.deliveryBy}</p>}
+          </div>
+        </section>
+
+        <table className="invoice-table w-full border-collapse text-[10px]">
+          <thead className="table-header-group">
+            <tr className="border border-gray-500 bg-gray-100">
+              <th rowSpan={2} className="border border-gray-400 px-1 py-2 text-center">Sr.</th>
+              <th rowSpan={2} className="border border-gray-400 px-2 py-2 text-left">Name of Product / Service</th>
+              <th rowSpan={2} className="border border-gray-400 px-1 py-2 text-left">HSN/SAC</th>
+              <th rowSpan={2} className="border border-gray-400 px-1 py-2 text-right">Qty</th>
+              <th rowSpan={2} className="border border-gray-400 px-1 py-2 text-right">Rate</th>
+              <th rowSpan={2} className="border border-gray-400 px-1 py-2 text-right">Taxable Value</th>
+              {invoice.gstEnabled && <th colSpan={2} className="border border-gray-400 px-1 py-1 text-center">GST</th>}
+              <th rowSpan={2} className="border border-gray-400 px-1 py-2 text-right">Total</th>
+            </tr>
+            {invoice.gstEnabled && <tr className="border border-gray-400 bg-gray-100"><th className="border border-gray-400 px-1 py-1 text-right">Rate</th><th className="border border-gray-400 px-1 py-1 text-right">Amount</th></tr>}
+          </thead>
+          <tbody>
+            {invoice.items.map((item, index) => <tr key={`${item.productSku}-${index}`} className="invoice-row border-b border-gray-400 align-top">
+              <td className="border-x border-gray-300 px-1 py-2 text-center">{index + 1}</td>
+              <td className="border-x border-gray-300 px-2 py-2">{item.productName || item.product?.name || "Item"}</td>
+              <td className="border-x border-gray-300 px-1 py-2">{item.hsnCode || "—"}</td>
+              <td className="border-x border-gray-300 px-1 py-2 text-right">{item.quantity} {item.unit}</td>
+              <td className="border-x border-gray-300 px-1 py-2 text-right">{formatCurrency(item.rate)}</td>
+              <td className="border-x border-gray-300 px-1 py-2 text-right">{formatCurrency(item.taxableAmount)}</td>
+              {invoice.gstEnabled && <td className="border-x border-gray-300 px-1 py-2 text-right">{item.gstPercent}%</td>}
+              {invoice.gstEnabled && <td className="border-x border-gray-300 px-1 py-2 text-right">{formatCurrency(item.cgstAmount + item.sgstAmount + item.igstAmount || item.amount - item.taxableAmount)}</td>}
+              <td className="border-x border-gray-300 px-1 py-2 text-right font-semibold">{formatCurrency(item.amount)}</td>
+            </tr>)}
+            <tr className="border border-gray-400 font-bold">
+              <td colSpan={invoice.gstEnabled ? 5 : 5} className="border border-gray-400 px-2 py-2 text-right">Total</td>
+              <td className="border border-gray-400 px-1 py-2 text-right">{formatCurrency(invoice.taxableAmount)}</td>
+              {invoice.gstEnabled && <td className="border border-gray-400 px-1 py-2 text-right"></td>}
+              {invoice.gstEnabled && <td className="border border-gray-400 px-1 py-2 text-right">{formatCurrency(invoice.gstAmount)}</td>}
+              <td className="border border-gray-400 px-1 py-2 text-right">{formatCurrency(invoice.totalAmount)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <section className="mt-4 grid grid-cols-2 gap-4 text-xs">
+          <div className="space-y-3">
+            <div className="border border-gray-400 p-3">
+              <p className="font-bold">Total in words</p>
+              <p className="mt-1 uppercase">{amountInWords(invoice.totalAmount)}</p>
+            </div>
+            <div className="border border-gray-400 p-3">
+              <p className="mb-2 font-bold">Bank Details</p>
+              <p>Name: {businessInfo.bank.accountHolder}</p>
+              <p>Bank: {businessInfo.bank.name}</p>
+              <p>Account No.: {businessInfo.bank.accountNumber}</p>
+            </div>
+          </div>
+          <div className="space-y-1 border border-gray-400 p-3">
+            <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(invoice.subtotal)}</span></div>
+            {invoice.discountAmount > 0 && <div className="flex justify-between"><span>Discount</span><span>−{formatCurrency(invoice.discountAmount)}</span></div>}
+            <div className="flex justify-between"><span>Taxable Amount</span><span>{formatCurrency(invoice.taxableAmount)}</span></div>
+            {invoice.gstEnabled && (taxSplitKnown ? invoice.igstAmount > 0
+              ? <div className="flex justify-between"><span>IGST</span><span>{formatCurrency(invoice.igstAmount)}</span></div>
+              : <><div className="flex justify-between"><span>CGST</span><span>{formatCurrency(invoice.cgstAmount)}</span></div><div className="flex justify-between"><span>SGST</span><span>{formatCurrency(invoice.sgstAmount)}</span></div></>
+              : <div className="flex justify-between"><span>GST</span><span>{formatCurrency(invoice.gstAmount)}</span></div>)}
+            <div className="flex justify-between border-t border-gray-500 pt-2 text-base font-bold"><span>Total Tax</span><span>{formatCurrency(invoice.gstAmount)}</span></div>
+            <div className="flex justify-between text-base font-extrabold"><span>Total Amount</span><span>{formatCurrency(invoice.totalAmount)}</span></div>
+            <div className="flex justify-between"><span>Amount Received</span><span>{formatCurrency(paidAmount)}</span></div>
+            <div className="flex justify-between font-semibold"><span>Balance Due</span><span>{formatCurrency(due)}</span></div>
+          </div>
+        </section>
+
+        <section className="mt-4 grid grid-cols-2 border border-gray-400 text-xs">
+          <div className="border-r border-gray-400 p-3">
+            <p className="mb-1 font-bold">Terms and Conditions</p>
+            <ol className="list-decimal space-y-0.5 pl-4">{businessInfo.invoiceTerms.map((term) => <li key={term}>{term}</li>)}</ol>
+            {invoice.notes && <p className="mt-2">Notes: {invoice.notes}</p>}
+            <div className="mt-6 border-t border-gray-400 pt-1">Customer Signature</div>
+          </div>
+          <div className="flex min-h-28 flex-col justify-between p-3 text-right">
+            <p className="font-semibold">Certified that the particulars given above are true and correct.</p>
+            <p>For {invoice.supplierName || businessInfo.nameEnglish}</p>
+            <p className="mt-8 border-t border-gray-400 pt-1">Authorized Signatory</p>
+          </div>
+        </section>
+        {invoice.status === "CANCELLED" && <p className="mt-4 rounded border border-red-300 p-3 text-sm font-bold text-red-700">CANCELLED — {invoice.cancellationReason}</p>}
+        <footer className="pt-3 text-xs font-semibold">{businessInfo.invoiceThankYou}</footer>
       </article>
 
       <article id="invoice-thermal" className={`invoice-document invoice-thermal thermal-${printFormat === "THERMAL_58" ? "58" : "80"} mx-auto my-8 hidden rounded border bg-white p-3 text-xs shadow-sm`}>

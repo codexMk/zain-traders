@@ -16,13 +16,13 @@ export async function GET(request: NextRequest) {
   const session = await requireAuth(request);
   if (session instanceof NextResponse) return session;
   const settings = await prisma.businessSettings.findUnique({ where: { id: "default" } });
-  return NextResponse.json(settings ?? {
-    id: "default",
-    legalName: businessInfo.nameEnglish,
-    address: businessInfo.address,
-    phoneNumbers: businessInfo.phones,
-    gstin: null,
-    registeredStateCode: null,
+  return NextResponse.json({
+    id: settings?.id ?? "default",
+    legalName: settings?.legalName ?? businessInfo.nameEnglish,
+    address: settings?.address || businessInfo.address,
+    phoneNumbers: settings?.phoneNumbers.length ? settings.phoneNumbers : businessInfo.phones,
+    gstin: settings?.gstin ?? businessInfo.gstin,
+    registeredStateCode: settings?.registeredStateCode ?? businessInfo.registeredStateCode,
   });
 }
 
