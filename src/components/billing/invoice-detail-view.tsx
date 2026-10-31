@@ -37,6 +37,8 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [signatureLoadError, setSignatureLoadError] = useState(false);
   const [printFormat, setPrintFormat] = useState<PrintFormat>("A4");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMode, setPaymentMode] = useState<"CASH" | "UPI">("CASH");
@@ -60,6 +62,27 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
   useEffect(() => fetchInvoice(), [fetchInvoice]);
 
   useEffect(() => {
+    let active = true;
+    fetch("/images/authorized-signature.png")
+      .then((response) => {
+        if (!response.ok) throw new Error("Could not load the authorized signature");
+        return response.blob();
+      })
+      .then((signatureBlob) => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Could not read the authorized signature"));
+        reader.onerror = () => reject(reader.error ?? new Error("Could not read the authorized signature"));
+        reader.readAsDataURL(signatureBlob);
+      }))
+      .then((signature) => { if (active) setSignatureDataUrl(signature); })
+      .catch((signatureError: unknown) => {
+        console.error("Could not load the authorized invoice signature", signatureError);
+        if (active) setSignatureLoadError(true);
+      });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     if (searchParams.get("print")) {
       const format = searchParams.get("print") === "THERMAL_58" ? "THERMAL_58" : searchParams.get("print") === "THERMAL_80" ? "THERMAL_80" : "A4";
       setPrintFormat(format);
@@ -73,7 +96,6 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
   const handlePrint = (format = printFormat) => {
     document.documentElement.dataset.printFormat = format;
     window.print();
-    window.setTimeout(() => { delete document.documentElement.dataset.printFormat; }, 1000);
   };
 
   const getPdfData = (): InvoicePdfData | null => {
@@ -123,20 +145,16 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
     };
   };
 
-  const handleDownload = async () => {
+  const handleDownload = () => {
     const data = getPdfData();
     if (!data) return;
     try {
-      const response = await fetch("/images/authorized-signature.png");
-      if (!response.ok) throw new Error("Could not load the authorized signature");
-      const signatureBlob = await response.blob();
-      const signature = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Could not read the authorized signature"));
-        reader.onerror = () => reject(reader.error ?? new Error("Could not read the authorized signature"));
-        reader.readAsDataURL(signatureBlob);
-      });
-      downloadInvoicePdf({ ...data, authorizedSignatureDataUrl: signature });
+      downloadInvoicePdf({ ...data, authorizedSignatureDataUrl: signatureDataUrl ?? undefined });
+      setError(signatureLoadError
+        ? "PDF downloaded, but the signature could not be included because its image failed to load."
+        : !signatureDataUrl
+          ? "PDF downloaded; the signature image was still loading and may not be included."
+          : "");
     } catch (pdfError) {
       setError(pdfError instanceof Error ? `Could not prepare the PDF: ${pdfError.message}` : "Could not prepare the PDF with the authorized signature. Please try again or use Print.");
     }
@@ -231,7 +249,7 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
             <p className="mt-1 font-semibold">Wholesale Spices &amp; Dry Fruits</p>
             <p className="mt-2 max-w-xl whitespace-pre-wrap text-xs">{invoice.supplierAddress || businessInfo.address}</p>
             <p className="text-xs">Phone: {(invoice.supplierPhones.length ? invoice.supplierPhones : businessInfo.phones).join(" | ")}</p>
-            <p className="mt-1 text-xs font-semibold">GSTIN: {invoice.supplierGstin || businessInfo.gstin}</p>
+            {invoice.gstEnabled && <p className="mt-1 text-xs font-semibold">GSTIN: {invoice.supplierGstin || businessInfo.gstin}</p>}
           </div>
           <div className="min-w-0 text-left sm:min-w-44 sm:text-right">
             <h2 className="text-xl font-bold">{invoice.gstEnabled ? "TAX INVOICE" : "NON-GST INVOICE"}</h2>
@@ -344,7 +362,7 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
       </article>
 
       <article id="invoice-thermal" className={`invoice-document invoice-thermal thermal-${printFormat === "THERMAL_58" ? "58" : "80"} mx-auto my-8 hidden rounded border bg-white p-3 text-xs shadow-sm`}>
-        <header className="text-center"><h2 className="text-base font-bold">{invoice.supplierName || businessInfo.nameEnglish}</h2><p>ज़ैन ट्रेडर्स</p><p>{invoice.supplierPhones.length ? invoice.supplierPhones.join(" · ") : businessInfo.phones.join(" · ")}</p>{invoice.supplierGstin && <p>GSTIN: {invoice.supplierGstin}</p>}<hr className="my-2 border-dashed border-gray-500" /><p className="font-bold">{invoice.gstEnabled ? "TAX INVOICE" : "NON-GST BILL"}</p><p>{invoice.invoiceNumber} · {fmtDate(invoice.invoiceDate)}</p>{invoice.customerName && <p>Customer: {invoice.customerName}</p>}</header>
+        <header className="text-center"><h2 className="text-base font-bold">{invoice.supplierName || businessInfo.nameEnglish}</h2><p>ज़ैन ट्रेडर्स</p><p>{invoice.supplierPhones.length ? invoice.supplierPhones.join(" · ") : businessInfo.phones.join(" · ")}</p>{invoice.gstEnabled && invoice.supplierGstin && <p>GSTIN: {invoice.supplierGstin}</p>}<hr className="my-2 border-dashed border-gray-500" /><p className="font-bold">{invoice.gstEnabled ? "TAX INVOICE" : "NON-GST BILL"}</p><p>{invoice.invoiceNumber} · {fmtDate(invoice.invoiceDate)}</p>{invoice.customerName && <p>Customer: {invoice.customerName}</p>}</header>
         <hr className="my-2 border-dashed border-gray-500" />
         <div className="space-y-2">{invoice.items.map((item, index) => <div key={`${item.productSku}-${index}`} className="thermal-item"><div className="break-words font-semibold">{item.productName || item.product?.name || "Item"}</div><div className="thermal-columns"><span>{item.quantity} {item.unit} × {formatCurrency(item.rate)}</span><span>{formatCurrency(item.amount)}</span></div>{item.discountAmount > 0 && <div className="thermal-columns text-gray-600"><span>Discount</span><span>−{formatCurrency(item.discountAmount)}</span></div>}</div>)}</div>
         <hr className="my-2 border-dashed border-gray-500" />

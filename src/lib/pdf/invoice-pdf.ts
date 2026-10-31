@@ -76,23 +76,23 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
     const addressLines = wrap(data.supplierAddress, contentWidth - 4).slice(0, 2);
     doc.text(addressLines, pageWidth / 2, 23, { align: "center" });
     doc.text(data.supplierPhones.join(" | "), pageWidth / 2, 31, { align: "center" });
-    const gstin = data.supplierGstin || businessInfo.gstin;
+    const gstin = data.gstEnabled ? data.supplierGstin || businessInfo.gstin : null;
     if (gstin) {
       doc.setTextColor(212, 175, 55);
       doc.text(`GSTIN: ${gstin}`, pageWidth - margin, 8, { align: "right" });
     }
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(6.5);
-    doc.text("ORIGINAL FOR RECIPIENT", pageWidth - margin, 13, { align: "right" });
+    if (data.gstEnabled) doc.text("ORIGINAL FOR RECIPIENT", pageWidth - margin, 13, { align: "right" });
   };
 
   const drawTableHeader = (y: number) => {
     doc.setFillColor(15, 61, 46);
     doc.rect(margin, y, contentWidth, 8, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(6.8);
+    doc.setFontSize(7.4);
     doc.setTextColor(255, 255, 255);
-    const cols = [
+    const cols = data.gstEnabled ? [
       { label: "Description", start: 2, width: 44, align: "left" as const },
       { label: "HSN/SAC", start: 46, width: 14, align: "left" as const },
       { label: "Qty", start: 60, width: 18, align: "right" as const },
@@ -102,6 +102,14 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
       { label: "GST %", start: 132, width: 12, align: "right" as const },
       { label: "GST Amt.", start: 144, width: 18, align: "right" as const },
       { label: "Total", start: 162, width: 22, align: "right" as const },
+    ] : [
+      { label: "Description", start: 2, width: 52, align: "left" as const },
+      { label: "HSN/SAC", start: 54, width: 18, align: "left" as const },
+      { label: "Qty", start: 72, width: 20, align: "right" as const },
+      { label: "Rate", start: 92, width: 23, align: "right" as const },
+      { label: "Disc.", start: 115, width: 18, align: "right" as const },
+      { label: "Taxable", start: 133, width: 25, align: "right" as const },
+      { label: "Total", start: 158, width: 26, align: "right" as const },
     ];
     for (const col of cols) {
       const x = margin + col.start + (col.align === "right" ? col.width : 0);
@@ -112,7 +120,7 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   drawHeader();
   doc.setTextColor(26, 26, 26);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
+  doc.setFontSize(14.5);
   doc.text(data.gstEnabled ? "TAX INVOICE" : "NON-GST INVOICE", margin, 43);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
@@ -122,9 +130,9 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   doc.text(`Mode: ${data.paymentType}`, pageWidth - margin, 54, { align: "right" });
   if (data.placeOfSupplyStateCode) doc.text(`Place of supply state code: ${data.placeOfSupplyStateCode}`, margin, 59);
 
-  const customerY = 64;
+  const customerY = data.placeOfSupplyStateCode ? 67 : 64;
   doc.setFillColor(248, 246, 239);
-  doc.roundedRect(margin, customerY, contentWidth, 20, 1.5, 1.5, "F");
+  doc.roundedRect(margin, customerY, contentWidth, 22, 1.5, 1.5, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.text("BILL TO", margin + 3, customerY + 5);
@@ -138,14 +146,15 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   if (data.customerGst) doc.text(`GSTIN: ${data.customerGst}`, pageWidth - margin - 3, customerY + 5, { align: "right" });
   if (data.deliveryBy) doc.text(`Delivery: ${data.deliveryBy}`, pageWidth - margin - 3, customerY + 10, { align: "right" });
 
-  let rowY = 91;
+  let rowY = customerY + 25;
   drawTableHeader(rowY);
   rowY += 9;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.2);
+  doc.setFontSize(8);
   for (const [index, item] of data.items.entries()) {
-    const nameLines = wrap(item.name, 42);
-    const rowHeight = Math.max(8, nameLines.length * 3.6 + 3);
+    const nameColumn = data.gstEnabled ? 44 : 52;
+    const nameLines = wrap(item.name, nameColumn - 3);
+    const rowHeight = Math.max(9, nameLines.length * 4 + 4);
     if (rowY + rowHeight > bottom - 40) {
       doc.addPage();
       drawHeader();
@@ -162,19 +171,35 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
     doc.setDrawColor(180, 180, 180);
     doc.rect(margin, rowY - 2, contentWidth, rowHeight);
     doc.setTextColor(28, 28, 28);
-    doc.text(nameLines, margin + 2, rowY + 2.4);
-    doc.text(item.hsnCode || "-", margin + 48, rowY + 2.4);
-    doc.text(`${item.quantity} ${item.unit}`, margin + 78, rowY + 2.4, { align: "right" });
-    doc.text(item.rate.toFixed(2), margin + 96, rowY + 2.4, { align: "right" });
-    doc.text(item.discountAmount.toFixed(2), margin + 110, rowY + 2.4, { align: "right" });
-    doc.text(item.taxableAmount.toFixed(2), margin + 132, rowY + 2.4, { align: "right" });
-    doc.text(data.gstEnabled ? `${item.gstPercent}%` : "-", margin + 144, rowY + 2.4, { align: "right" });
-    doc.text(data.gstEnabled ? (gstAmount || item.amount - item.taxableAmount).toFixed(2) : "-", margin + 162, rowY + 2.4, { align: "right" });
-    doc.text(item.amount.toFixed(2), margin + 184, rowY + 2.4, { align: "right" });
+    const cells = data.gstEnabled
+      ? [
+          { value: nameLines, start: 2, width: 44, align: "left" as const },
+          { value: item.hsnCode || "-", start: 46, width: 14, align: "left" as const },
+          { value: `${item.quantity} ${item.unit}`, start: 60, width: 18, align: "right" as const },
+          { value: item.rate.toFixed(2), start: 78, width: 18, align: "right" as const },
+          { value: item.discountAmount.toFixed(2), start: 96, width: 14, align: "right" as const },
+          { value: item.taxableAmount.toFixed(2), start: 110, width: 22, align: "right" as const },
+          { value: `${item.gstPercent}%`, start: 132, width: 12, align: "right" as const },
+          { value: (gstAmount || item.amount - item.taxableAmount).toFixed(2), start: 144, width: 18, align: "right" as const },
+          { value: item.amount.toFixed(2), start: 162, width: 22, align: "right" as const },
+        ]
+      : [
+          { value: nameLines, start: 2, width: 52, align: "left" as const },
+          { value: item.hsnCode || "-", start: 54, width: 18, align: "left" as const },
+          { value: `${item.quantity} ${item.unit}`, start: 72, width: 20, align: "right" as const },
+          { value: item.rate.toFixed(2), start: 92, width: 23, align: "right" as const },
+          { value: item.discountAmount.toFixed(2), start: 115, width: 18, align: "right" as const },
+          { value: item.taxableAmount.toFixed(2), start: 133, width: 25, align: "right" as const },
+          { value: item.amount.toFixed(2), start: 158, width: 26, align: "right" as const },
+        ];
+    for (const cell of cells) {
+      const x = margin + cell.start + (cell.align === "right" ? cell.width : 0);
+      doc.text(cell.value, x, rowY + 3, { align: cell.align });
+    }
     rowY += rowHeight;
   }
 
-  const totalsHeight = 90 + (data.gstEnabled ? 12 : 0) + (data.notes ? 8 : 0);
+  const totalsHeight = 100 + (data.gstEnabled ? 12 : 0) + (data.notes ? 8 : 0);
   if (rowY + totalsHeight > bottom) {
     doc.addPage();
     drawHeader();
@@ -185,11 +210,11 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   const valueX = pageWidth - margin;
   const totalRow = (label: string, value: string, bold = false) => {
     doc.setFont("helvetica", bold ? "bold" : "normal");
-    doc.setFontSize(bold ? 9.5 : 8);
+    doc.setFontSize(bold ? 10.5 : 9);
     doc.setTextColor(bold ? 15 : 45, bold ? 61 : 45, bold ? 46 : 45);
     doc.text(label, labelX, rowY);
     doc.text(value, valueX, rowY, { align: "right" });
-    rowY += bold ? 6 : 4.5;
+    rowY += bold ? 6.5 : 5;
   };
   totalRow("Subtotal", money(data.subtotal));
   totalRow("Discount", `-${money(data.discountAmount)}`);
@@ -211,32 +236,32 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   doc.setTextColor(80, 80, 80);
   const footerStart = rowY + 2;
   doc.setDrawColor(170, 170, 170);
-  doc.rect(margin, footerStart - 4, contentWidth, 74);
+  doc.rect(margin, footerStart - 4, contentWidth, 84);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
+  doc.setFontSize(8.5);
   doc.setTextColor(35, 35, 35);
   doc.text("Total in words", margin + 3, footerStart + 2);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.text(wrap(amountInWords(data.totalAmount).toUpperCase(), 90).slice(0, 2), margin + 3, footerStart + 7);
+  doc.setFontSize(8);
+  doc.text(wrap(amountInWords(data.totalAmount).toUpperCase(), 90).slice(0, 3), margin + 3, footerStart + 8);
   doc.setDrawColor(180, 180, 180);
-  doc.line(margin + 98, footerStart - 4, margin + 98, footerStart + 70);
+  doc.line(margin + 98, footerStart - 4, margin + 98, footerStart + 80);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
+  doc.setFontSize(8.5);
   doc.text("Bank Details", margin + 3, footerStart + 21);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
+  doc.setFontSize(8);
   doc.text(`Account holder: ${businessInfo.bank.accountHolder}`, margin + 3, footerStart + 27);
   doc.text(`Bank: ${businessInfo.bank.name}`, margin + 3, footerStart + 32);
   doc.text(`Account number: ${businessInfo.bank.accountNumber}`, margin + 3, footerStart + 37);
   doc.setFont("helvetica", "bold");
   doc.text("Terms and Conditions", margin + 3, footerStart + 48);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
+  doc.setFontSize(7.5);
   const termsText = businessInfo.invoiceTerms.map((term, index) => `${index + 1}. ${term}`).join("  ");
   doc.text(wrap(termsText, 90).slice(0, 4), margin + 3, footerStart + 53);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
+  doc.setFontSize(8);
   doc.text(`For ${data.supplierName || businessInfo.nameEnglish}`, pageWidth - margin - 3, footerStart + 40, { align: "right" });
   if (data.authorizedSignatureDataUrl) {
     doc.addImage(data.authorizedSignatureDataUrl, "PNG", pageWidth - margin - 45, footerStart + 43, 42, 14);
