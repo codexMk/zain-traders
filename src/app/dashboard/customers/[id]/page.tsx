@@ -173,8 +173,8 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
       <div className="rounded-2xl border bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold">Payment history</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+        <div role="region" aria-label="Customer payment history" tabIndex={0} className="overflow-x-auto overscroll-x-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-emerald">
+          <table className="min-w-[600px] text-sm">
             <thead>
               <tr className="border-b bg-gray-50 text-left text-gray-500">
                 <th className="px-3 py-2">Date</th>

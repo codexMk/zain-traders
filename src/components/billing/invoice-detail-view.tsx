@@ -224,16 +224,16 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
       </div>
       {error && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 print:hidden">{error}</div>}
 
-      <article id="invoice-a4" className="invoice-document invoice-a4 mx-auto max-w-[210mm] border border-gray-500 bg-white p-5 text-gray-900 shadow-lg print:shadow-none">
-        <header className="grid grid-cols-[1fr_auto] items-start gap-5 border-b-2 border-brand-emerald pb-4">
+      <article id="invoice-a4" className="invoice-document invoice-a4 mx-auto max-w-[210mm] border border-gray-500 bg-white p-3 text-gray-900 shadow-lg sm:p-5 print:shadow-none">
+        <header className="grid min-w-0 grid-cols-1 items-start gap-3 border-b-2 border-brand-emerald pb-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-5">
           <div>
-            <h1 className="text-2xl font-extrabold uppercase tracking-wide text-brand-emerald">{invoice.supplierName || businessInfo.nameEnglish}</h1>
+            <h1 className="break-words text-xl font-extrabold uppercase tracking-wide text-brand-emerald sm:text-2xl">{invoice.supplierName || businessInfo.nameEnglish}</h1>
             <p className="mt-1 font-semibold">Wholesale Spices &amp; Dry Fruits</p>
             <p className="mt-2 max-w-xl whitespace-pre-wrap text-xs">{invoice.supplierAddress || businessInfo.address}</p>
             <p className="text-xs">Phone: {(invoice.supplierPhones.length ? invoice.supplierPhones : businessInfo.phones).join(" | ")}</p>
             <p className="mt-1 text-xs font-semibold">GSTIN: {invoice.supplierGstin || businessInfo.gstin}</p>
           </div>
-          <div className="min-w-44 text-right">
+          <div className="min-w-0 text-left sm:min-w-44 sm:text-right">
             <h2 className="text-xl font-bold">{invoice.gstEnabled ? "TAX INVOICE" : "NON-GST INVOICE"}</h2>
             <p className="mt-2 text-sm">Invoice No: <b>{invoice.invoiceNumber}</b></p>
             <p className="text-sm">Invoice Date: {fmtDate(invoice.invoiceDate)}</p>
@@ -242,8 +242,8 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
           </div>
         </header>
 
-        <section className="my-4 grid grid-cols-2 border border-gray-400 text-xs">
-          <div className="border-r border-gray-400 p-3">
+        <section className="my-4 grid grid-cols-1 border border-gray-400 text-xs sm:grid-cols-2">
+          <div className="border-b border-gray-400 p-3 sm:border-b-0 sm:border-r">
             <p className="mb-2 bg-gray-100 px-2 py-1 font-bold uppercase">Customer Details</p>
             <p className="font-bold">{invoice.customerName || "Walk-in Customer"}</p>
             {invoice.customerMobile && <p>Phone: {invoice.customerMobile}</p>}
@@ -257,7 +257,8 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
           </div>
         </section>
 
-        <table className="invoice-table w-full border-collapse text-[10px]">
+        <div role="region" aria-label="Invoice line items" tabIndex={0} className="invoice-table-scroll -mx-1 overflow-x-auto overscroll-x-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-emerald sm:mx-0">
+        <table className="invoice-table w-full min-w-[650px] border-collapse text-[10px]">
           <thead className="table-header-group">
             <tr className="border border-gray-500 bg-gray-100">
               <th rowSpan={2} className="border border-gray-400 px-1 py-2 text-center">Sr.</th>
@@ -292,8 +293,9 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
             </tr>
           </tbody>
         </table>
+        </div>
 
-        <section className="mt-4 grid grid-cols-2 gap-4 text-xs">
+        <section className="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 sm:gap-4">
           <div className="space-y-3">
             <div className="border border-gray-400 p-3">
               <p className="font-bold">Total in words</p>
@@ -321,8 +323,8 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
           </div>
         </section>
 
-        <section className="mt-4 grid grid-cols-2 border border-gray-400 text-xs">
-          <div className="border-r border-gray-400 p-3">
+        <section className="mt-4 grid grid-cols-1 border border-gray-400 text-xs sm:grid-cols-2">
+          <div className="border-b border-gray-400 p-3 sm:border-b-0 sm:border-r">
             <p className="mb-1 font-bold">Terms and Conditions</p>
             <ol className="list-decimal space-y-0.5 pl-4">{businessInfo.invoiceTerms.map((term) => <li key={term}>{term}</li>)}</ol>
             {invoice.notes && <p className="mt-2">Notes: {invoice.notes}</p>}

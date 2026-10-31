@@ -336,8 +336,8 @@ export default function InvoiceForm({ initialData, isEditing }: InvoiceFormProps
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div role="region" aria-label="Invoice line items" tabIndex={0} className="overflow-x-auto overscroll-x-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
+              <table className="min-w-[560px] text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-4 py-2 text-left font-semibold text-gray-900">Product</th>

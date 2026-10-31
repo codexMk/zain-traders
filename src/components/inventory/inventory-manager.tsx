@@ -190,13 +190,13 @@ export default function InventoryManager() {
         </form>
       )}
 
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
         <input
           type="text"
           placeholder="Search products..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-[200px] px-4 py-3 border rounded-xl"
+          className="w-full min-w-0 flex-1 rounded-xl border px-4 py-3 sm:min-w-[200px]"
         />
         <label className="flex items-center gap-2 cursor-pointer">
           <input
@@ -209,8 +209,9 @@ export default function InventoryManager() {
         </label>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+        <div role="region" aria-label="Inventory stock table" tabIndex={0} className="overflow-x-auto overscroll-x-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-emerald">
+        <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-brand-emerald text-white">
             <tr>
               <th className="px-4 py-3 text-left">Product</th>
@@ -251,6 +252,7 @@ export default function InventoryManager() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

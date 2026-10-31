@@ -230,8 +230,8 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
         {!purchase.isCompleted && (
           <p className="mb-3 text-sm text-amber-700">Stock will post to inventory when this purchase is approved and receipt is confirmed.</p>
         )}
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+        <div role="region" aria-label="Inventory impact" tabIndex={0} className="overflow-x-auto overscroll-x-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-emerald">
+          <table className="min-w-[620px] text-sm">
             <thead>
               <tr className="border-b bg-gray-50 text-left text-gray-500">
                 <th className="px-3 py-2">Product</th>

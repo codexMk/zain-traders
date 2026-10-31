@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -17,7 +17,6 @@ import {
   BarChart3,
   LogOut,
   Settings,
-  ChevronDown,
 } from "lucide-react";
 
 export default function DashboardLayout({
@@ -25,10 +24,17 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, []);
 
   const menuItems = [
     {
@@ -93,10 +99,10 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-dvh min-h-svh w-full overflow-hidden bg-gray-50">
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-40 flex h-screen w-64 flex-col overflow-hidden bg-emerald-900 text-white transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex h-dvh w-64 max-w-[85vw] flex-col overflow-hidden bg-emerald-900 text-white transform transition-transform duration-300 ease-in-out lg:static lg:max-w-none lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -107,7 +113,7 @@ export default function DashboardLayout({
         </div>
 
         {/* Navigation */}
-        <nav aria-label="ERP navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-4">
+        <nav aria-label="ERP navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -116,7 +122,9 @@ export default function DashboardLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center px-4 py-3 rounded-lg transition ${
+                onClick={() => setMobileOpen(false)}
+                aria-current={active ? "page" : undefined}
+                className={`flex min-h-11 items-center rounded-lg px-4 py-3 transition ${
                   active
                     ? "bg-emerald-700 text-white"
                     : "text-emerald-100 hover:bg-emerald-800"
@@ -133,6 +141,8 @@ export default function DashboardLayout({
         <div className="shrink-0 space-y-2 border-t border-emerald-800 p-4">
           <Link
             href="/dashboard/settings"
+            onClick={() => setMobileOpen(false)}
+            aria-current={isActive("/dashboard/settings") ? "page" : undefined}
             className={`flex items-center px-4 py-3 rounded-lg transition ${
               isActive("/dashboard/settings")
                 ? "bg-emerald-700 text-white"
@@ -145,6 +155,7 @@ export default function DashboardLayout({
 
           <button
             onClick={handleLogout}
+            type="button"
             className="w-full flex items-center px-4 py-3 rounded-lg text-emerald-100 hover:bg-emerald-800 transition"
           >
             <LogOut size={20} className="mr-3" />
@@ -155,37 +166,42 @@ export default function DashboardLayout({
 
       {/* Mobile Overlay */}
       {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 lg:hidden z-30"
+        <button
+          type="button"
+          aria-label="Close ERP navigation"
+          className="fixed inset-0 z-30 cursor-default bg-black/50 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top Bar */}
-        <div className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-4">
+        <header className="flex min-h-16 shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-2 shadow-sm sm:px-4 md:px-6">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="lg:hidden text-gray-600"
+              type="button"
+              aria-label={mobileOpen ? "Close ERP navigation" : "Open ERP navigation"}
+              aria-expanded={mobileOpen}
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 lg:hidden"
             >
               {mobileOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
-            <h2 className="text-xl font-semibold text-gray-800 hidden lg:block">
+            <h2 className="truncate text-sm font-semibold text-gray-800 sm:text-base lg:text-xl">
               ERP Dashboard
             </h2>
           </div>
 
-          <div className="text-sm text-gray-600">
+          <div className="hidden shrink-0 text-xs text-gray-600 sm:block md:text-sm">
             Welcome to Zain Traders Management System
           </div>
-        </div>
+        </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto">
-          <div className="p-6">{children}</div>
-        </div>
+        <main className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain">
+          <div className="min-w-0 p-3 sm:p-4 lg:p-6">{children}</div>
+        </main>
       </div>
     </div>
   );

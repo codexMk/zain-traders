@@ -94,7 +94,7 @@ const StatCard = ({
   icon: React.ReactNode;
   color: string;
 }) => (
-  <div className="bg-white rounded-lg shadow p-6 border-l-4" style={{ borderColor: color }}>
+  <div className="min-w-0 rounded-lg border-l-4 bg-white p-4 shadow sm:p-6" style={{ borderColor: color }}>
     <div className="flex items-center justify-between">
       <div>
         <p className="text-gray-600 text-sm mb-1">{label}</p>
@@ -161,15 +161,15 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Dashboard</h1>
         <p className="text-gray-600 mt-1">Welcome to your ERP system</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 lg:gap-6">
         <StatCard
           label="Today's Sales"
           value={`₹${stats.todaySales.toLocaleString()}`}
@@ -215,7 +215,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
         {/* Sales Chart */}
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales Graph</h3>

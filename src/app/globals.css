@@ -162,6 +162,10 @@ img {
     visibility: visible !important;
   }
 
+  .invoice-table-scroll {
+    overflow: visible !important;
+  }
+
   #invoice-a4,
   #invoice-thermal {
     display: none !important;

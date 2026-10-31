@@ -71,17 +71,17 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
           <Link href="/dashboard/suppliers" className="inline-flex items-center gap-2 text-sm text-brand-emerald">
             <ArrowLeft size={16} /> Back
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{supplier.name}</h1>
+            <h1 className="break-words text-2xl font-bold text-gray-900 sm:text-3xl">{supplier.name}</h1>
             <p className="text-gray-600">{supplier.contactPerson || "Primary contact not set"}</p>
           </div>
         </div>
-        <Link href="/dashboard/accounting" className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+        <Link href="/dashboard/accounting" className="rounded-xl bg-amber-500 px-4 py-3 text-center text-sm font-semibold text-white hover:opacity-90 sm:py-2">
           Record supplier payment
         </Link>
       </div>
@@ -145,7 +145,8 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
       {(supplier.paymentHistory?.length ?? 0) > 0 && (
         <div className="rounded-2xl border bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold">Supplier payment history</h2>
-          <table className="min-w-full text-sm">
+          <div role="region" aria-label="Supplier payment history" tabIndex={0} className="overflow-x-auto overscroll-x-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-emerald">
+          <table className="min-w-[520px] text-sm">
             <thead>
               <tr className="border-b bg-gray-50 text-left text-gray-500">
                 <th className="px-3 py-2">Date</th>
@@ -165,6 +166,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>
