@@ -1,3 +1,6 @@
+ALTER TABLE "Invoice"
+  ADD COLUMN IF NOT EXISTS "idempotencyKey" TEXT;
+
 DO $$
 BEGIN
   IF EXISTS (
