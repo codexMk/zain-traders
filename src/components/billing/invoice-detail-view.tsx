@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, Copy, Download, MessageCircle, Printer, RotateCcw, XCircle } from "lucide-react";
 import { amountInWords, formatCurrency } from "@/lib/invoice-utils";
@@ -122,7 +123,24 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
     };
   };
 
-  const handleDownload = () => { const data = getPdfData(); if (data) downloadInvoicePdf(data); };
+  const handleDownload = async () => {
+    const data = getPdfData();
+    if (!data) return;
+    try {
+      const response = await fetch("/images/authorized-signature.png");
+      if (!response.ok) throw new Error("Could not load the authorized signature");
+      const signatureBlob = await response.blob();
+      const signature = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Could not read the authorized signature"));
+        reader.onerror = () => reject(reader.error ?? new Error("Could not read the authorized signature"));
+        reader.readAsDataURL(signatureBlob);
+      });
+      downloadInvoicePdf({ ...data, authorizedSignatureDataUrl: signature });
+    } catch (pdfError) {
+      setError(pdfError instanceof Error ? `Could not prepare the PDF: ${pdfError.message}` : "Could not prepare the PDF with the authorized signature. Please try again or use Print.");
+    }
+  };
   const handleWhatsApp = () => {
     if (!invoice) return;
     const message = encodeURIComponent(`${invoice.supplierName || businessInfo.nameEnglish}\nInvoice: ${invoice.invoiceNumber}\nCustomer: ${invoice.customerName}\nTotal: ${formatCurrency(invoice.totalAmount)}\nBalance due: ${formatCurrency(Math.max(0, invoice.totalAmount - invoice.paidAmount))}`);
@@ -216,7 +234,7 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
             <p className="mt-1 text-xs font-semibold">GSTIN: {invoice.supplierGstin || businessInfo.gstin}</p>
           </div>
           <div className="min-w-44 text-right">
-            <h2 className="text-xl font-bold">{invoice.gstEnabled ? "TAX INVOICE" : "INVOICE"}</h2>
+            <h2 className="text-xl font-bold">{invoice.gstEnabled ? "TAX INVOICE" : "NON-GST INVOICE"}</h2>
             <p className="mt-2 text-sm">Invoice No: <b>{invoice.invoiceNumber}</b></p>
             <p className="text-sm">Invoice Date: {fmtDate(invoice.invoiceDate)}</p>
             {invoice.placeOfSupplyStateCode && <p className="text-sm">Place of Supply: {invoice.placeOfSupplyStateCode}</p>}
@@ -313,7 +331,10 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
           <div className="flex min-h-28 flex-col justify-between p-3 text-right">
             <p className="font-semibold">Certified that the particulars given above are true and correct.</p>
             <p>For {invoice.supplierName || businessInfo.nameEnglish}</p>
-            <p className="mt-8 border-t border-gray-400 pt-1">Authorized Signatory</p>
+            <div className="mt-1 flex min-h-20 flex-col items-end justify-end">
+              <Image src="/images/authorized-signature.png" alt="Authorized signature of Muntsar Pathan" width={200} height={67} className="h-14 w-40 object-contain" />
+              <p className="w-40 border-t border-gray-400 pt-1">Authorized Signatory</p>
+            </div>
           </div>
         </section>
         {invoice.status === "CANCELLED" && <p className="mt-4 rounded border border-red-300 p-3 text-sm font-bold text-red-700">CANCELLED — {invoice.cancellationReason}</p>}
@@ -321,7 +342,7 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
       </article>
 
       <article id="invoice-thermal" className={`invoice-document invoice-thermal thermal-${printFormat === "THERMAL_58" ? "58" : "80"} mx-auto my-8 hidden rounded border bg-white p-3 text-xs shadow-sm`}>
-        <header className="text-center"><h2 className="text-base font-bold">{invoice.supplierName || businessInfo.nameEnglish}</h2><p>ज़ैन ट्रेडर्स</p><p>{invoice.supplierPhones.length ? invoice.supplierPhones.join(" · ") : businessInfo.phones.join(" · ")}</p>{invoice.supplierGstin && <p>GSTIN: {invoice.supplierGstin}</p>}<hr className="my-2 border-dashed border-gray-500" /><p className="font-bold">{invoice.gstEnabled ? "TAX INVOICE" : "RECEIPT"}</p><p>{invoice.invoiceNumber} · {fmtDate(invoice.invoiceDate)}</p>{invoice.customerName && <p>Customer: {invoice.customerName}</p>}</header>
+        <header className="text-center"><h2 className="text-base font-bold">{invoice.supplierName || businessInfo.nameEnglish}</h2><p>ज़ैन ट्रेडर्स</p><p>{invoice.supplierPhones.length ? invoice.supplierPhones.join(" · ") : businessInfo.phones.join(" · ")}</p>{invoice.supplierGstin && <p>GSTIN: {invoice.supplierGstin}</p>}<hr className="my-2 border-dashed border-gray-500" /><p className="font-bold">{invoice.gstEnabled ? "TAX INVOICE" : "NON-GST BILL"}</p><p>{invoice.invoiceNumber} · {fmtDate(invoice.invoiceDate)}</p>{invoice.customerName && <p>Customer: {invoice.customerName}</p>}</header>
         <hr className="my-2 border-dashed border-gray-500" />
         <div className="space-y-2">{invoice.items.map((item, index) => <div key={`${item.productSku}-${index}`} className="thermal-item"><div className="break-words font-semibold">{item.productName || item.product?.name || "Item"}</div><div className="thermal-columns"><span>{item.quantity} {item.unit} × {formatCurrency(item.rate)}</span><span>{formatCurrency(item.amount)}</span></div>{item.discountAmount > 0 && <div className="thermal-columns text-gray-600"><span>Discount</span><span>−{formatCurrency(item.discountAmount)}</span></div>}</div>)}</div>
         <hr className="my-2 border-dashed border-gray-500" />

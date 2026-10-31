@@ -3,6 +3,7 @@ import { businessInfo } from "@/lib/business-info";
 import { amountInWords, formatCurrency } from "@/lib/invoice-utils";
 
 export interface InvoicePdfData {
+  authorizedSignatureDataUrl?: string;
   invoiceNumber: string;
   invoiceDate: string;
   customerName: string;
@@ -112,7 +113,7 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   doc.setTextColor(26, 26, 26);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text(data.gstEnabled ? "TAX INVOICE" : "INVOICE", margin, 43);
+  doc.text(data.gstEnabled ? "TAX INVOICE" : "NON-GST INVOICE", margin, 43);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.text(`Invoice: ${data.invoiceNumber}`, margin, 49);
@@ -236,7 +237,10 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   doc.text(wrap(termsText, 90).slice(0, 4), margin + 3, footerStart + 53);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7);
-  doc.text(`For ${data.supplierName || businessInfo.nameEnglish}`, pageWidth - margin - 3, footerStart + 55, { align: "right" });
+  doc.text(`For ${data.supplierName || businessInfo.nameEnglish}`, pageWidth - margin - 3, footerStart + 40, { align: "right" });
+  if (data.authorizedSignatureDataUrl) {
+    doc.addImage(data.authorizedSignatureDataUrl, "PNG", pageWidth - margin - 45, footerStart + 43, 42, 14);
+  }
   doc.setDrawColor(120, 120, 120);
   doc.line(pageWidth - margin - 45, footerStart + 64, pageWidth - margin - 3, footerStart + 64);
   doc.setFont("helvetica", "normal");

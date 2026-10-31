@@ -46,11 +46,11 @@ export function DashboardLayoutClient({ children }: { children: React.ReactNode 
   return (
     <div className="dashboard-shell flex h-screen bg-brand-cream">
       <div
-        className={`dashboard-sidebar fixed inset-y-0 left-0 z-40 w-64 bg-brand-emerald text-white transform transition-transform duration-300 lg:static lg:translate-x-0 ${
+        className={`dashboard-sidebar fixed inset-y-0 left-0 z-40 flex h-screen w-64 flex-col bg-brand-emerald text-white transform transition-transform duration-300 lg:static lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="p-6 border-b border-white/10">
+        <div className="shrink-0 border-b border-white/10 p-6">
           <h1 className="text-xl font-bold text-brand-gold">ज़ैन ट्रेडर्स</h1>
           <p className="text-xs text-white/70">Billing & Inventory</p>
           {session?.user && (
@@ -60,7 +60,7 @@ export function DashboardLayoutClient({ children }: { children: React.ReactNode 
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+        <nav aria-label="ERP navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-4">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -80,7 +80,7 @@ export function DashboardLayoutClient({ children }: { children: React.ReactNode 
           })}
         </nav>
 
-        <div className="p-4 border-t border-white/10 space-y-2">
+        <div className="shrink-0 space-y-2 border-t border-white/10 p-4">
           <Link
             href="/dashboard/settings"
             className={`flex items-center px-4 py-3 rounded-xl transition ${
