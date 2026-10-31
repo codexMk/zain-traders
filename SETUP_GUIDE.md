@@ -240,7 +240,7 @@ DATABASE_URL=postgresql://user:password@prod-db-host:5432/db_name
 NEXTAUTH_URL=https://yourdomain.com
 ```
 
-The production build runs `prisma db push` before compiling so the deployed database schema matches the Prisma models. Configure `DATABASE_URL` in the deployment environment for the intended database. Prisma will stop the build if a schema change requires destructive confirmation; review those changes rather than bypassing the prompt.
+The production build checks for duplicate invoice idempotency keys, creates the required unique index when safe, then runs `prisma db push` before compiling. Configure `DATABASE_URL` in the deployment environment for the intended database. Builds stop if duplicate keys need review or Prisma requires confirmation for a potentially destructive schema change; do not bypass those checks.
 
 ### Build for Production
 ```bash

@@ -267,7 +267,7 @@ git push origin main
 # Deploy via Vercel dashboard
 ```
 
-The production build synchronizes the Prisma schema with the configured `DATABASE_URL` before compiling. Make sure each Vercel environment points to its intended database; schema changes requiring destructive confirmation stop the build for review.
+The production build checks for duplicate invoice idempotency keys and creates the required unique index before synchronizing the Prisma schema. Make sure each Vercel environment points to its intended database; builds stop for review if duplicate keys need cleanup or another schema change requires destructive confirmation.
 
 ### Docker
 ```bash
