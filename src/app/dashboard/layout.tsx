@@ -96,18 +96,18 @@ export default function DashboardLayout({
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-emerald-900 text-white transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex h-screen w-64 flex-col overflow-hidden bg-emerald-900 text-white transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Logo */}
-        <div className="p-6 border-b border-emerald-800">
+        <div className="shrink-0 border-b border-emerald-800 p-6">
           <h1 className="text-xl font-bold">ज़ैन ट्रेडर्स</h1>
           <p className="text-xs text-emerald-200">ERP System</p>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+        <nav aria-label="ERP navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-4">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -130,7 +130,7 @@ export default function DashboardLayout({
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-emerald-800 space-y-2">
+        <div className="shrink-0 space-y-2 border-t border-emerald-800 p-4">
           <Link
             href="/dashboard/settings"
             className={`flex items-center px-4 py-3 rounded-lg transition ${
