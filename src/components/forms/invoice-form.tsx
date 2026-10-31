@@ -46,6 +46,12 @@ export default function InvoiceForm({ initialData, isEditing }: InvoiceFormProps
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState(initialData?.customerId || "");
+  const [customerDetails, setCustomerDetails] = useState({
+    name: "",
+    mobile: "",
+    address: "",
+    gstNumber: "",
+  });
   const [discount, setDiscount] = useState(initialData?.discount || 0);
   const [lineItems, setLineItems] = useState<LineItem[]>(initialData?.items || []);
 
@@ -124,14 +130,30 @@ export default function InvoiceForm({ initialData, isEditing }: InvoiceFormProps
     setSuccess(false);
     setIsLoading(true);
 
-    if (!selectedCustomer) {
+    if (isEditing && !selectedCustomer) {
       setError("Please select a customer");
+      setIsLoading(false);
+      return;
+    }
+
+    if (
+      !isEditing &&
+      (!customerDetails.name.trim() ||
+        !customerDetails.mobile.trim() ||
+        !customerDetails.address.trim())
+    ) {
+      setError("Enter the customer's name, mobile number, and address");
       setIsLoading(false);
       return;
     }
 
     if (lineItems.length === 0) {
       setError("Please add at least one item");
+      setIsLoading(false);
+      return;
+    }
+    if (lineItems.some((item) => !item.productId || item.quantity <= 0 || item.rate < 0)) {
+      setError("Choose a product and enter a valid quantity and rate for each item");
       setIsLoading(false);
       return;
     }
@@ -144,9 +166,30 @@ export default function InvoiceForm({ initialData, isEditing }: InvoiceFormProps
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customerId: selectedCustomer,
-          discount,
-          items: lineItems,
+          ...(isEditing
+            ? {
+                customerId: selectedCustomer,
+                discount,
+                items: lineItems,
+              }
+            : {
+                customer: {
+                  ...customerDetails,
+                  name: customerDetails.name.trim(),
+                  mobile: customerDetails.mobile.trim(),
+                  address: customerDetails.address.trim(),
+                  gstNumber: customerDetails.gstNumber.trim() || undefined,
+                },
+                invoiceDate: new Date().toISOString(),
+                invoiceType: "GST_INVOICE",
+                discountAmount: discount,
+                items: lineItems.map((item) => ({
+                  productId: item.productId,
+                  quantity: item.quantity,
+                  rate: item.rate,
+                  gstPercent: 5,
+                })),
+              }),
         }),
       });
 
@@ -160,7 +203,7 @@ export default function InvoiceForm({ initialData, isEditing }: InvoiceFormProps
       setTimeout(() => {
         router.push("/dashboard/billing");
       }, 1500);
-    } catch (err) {
+    } catch {
       setError("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
@@ -207,25 +250,76 @@ export default function InvoiceForm({ initialData, isEditing }: InvoiceFormProps
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Customer Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Customer *
-            </label>
-            <select
-              value={selectedCustomer}
-              onChange={(e) => setSelectedCustomer(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-              disabled={isLoading}
-            >
-              <option value="">Select a customer</option>
-              {customers.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name} ({customer.city})
-                </option>
-              ))}
-            </select>
-          </div>
+          {isEditing ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Customer *
+              </label>
+              <select
+                value={selectedCustomer}
+                onChange={(e) => setSelectedCustomer(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                disabled={isLoading}
+              >
+                <option value="">Select a customer</option>
+                {customers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name} ({customer.city})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <fieldset className="space-y-4 rounded-lg border border-gray-200 p-4">
+              <legend className="px-2 text-lg font-semibold text-gray-900">Customer Details</legend>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Customer name *
+                  <input
+                    value={customerDetails.name}
+                    onChange={(event) => setCustomerDetails({ ...customerDetails, name: event.target.value })}
+                    autoComplete="name"
+                    required
+                    disabled={isLoading}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Mobile number *
+                  <input
+                    type="tel"
+                    value={customerDetails.mobile}
+                    onChange={(event) => setCustomerDetails({ ...customerDetails, mobile: event.target.value })}
+                    autoComplete="tel"
+                    required
+                    disabled={isLoading}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-gray-700 md:col-span-2">
+                  Address *
+                  <textarea
+                    value={customerDetails.address}
+                    onChange={(event) => setCustomerDetails({ ...customerDetails, address: event.target.value })}
+                    autoComplete="street-address"
+                    required
+                    rows={2}
+                    disabled={isLoading}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-gray-700 md:col-span-2">
+                  GST number (optional)
+                  <input
+                    value={customerDetails.gstNumber}
+                    onChange={(event) => setCustomerDetails({ ...customerDetails, gstNumber: event.target.value })}
+                    disabled={isLoading}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 uppercase outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                  />
+                </label>
+              </div>
+            </fieldset>
+          )}
 
           {/* Line Items */}
           <div>
