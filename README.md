@@ -267,6 +267,8 @@ git push origin main
 # Deploy via Vercel dashboard
 ```
 
+The production build synchronizes the Prisma schema with the configured `DATABASE_URL` before compiling. Make sure each Vercel environment points to its intended database; schema changes requiring destructive confirmation stop the build for review.
+
 ### Docker
 ```bash
 docker build -t zain-traders-erp .

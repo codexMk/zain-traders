@@ -38,47 +38,47 @@ export default function DashboardLayout({
     },
     {
       label: "Products",
-      href: "/products",
+      href: "/dashboard/products",
       icon: Package,
     },
     {
       label: "Suppliers",
-      href: "/suppliers",
+      href: "/dashboard/suppliers",
       icon: Briefcase,
     },
     {
       label: "Customers",
-      href: "/customers",
+      href: "/dashboard/customers",
       icon: Users,
     },
     {
       label: "Purchase",
-      href: "/purchases",
+      href: "/dashboard/purchases",
       icon: ShoppingCart,
     },
     {
       label: "Billing",
-      href: "/billing",
+      href: "/dashboard/billing",
       icon: FileText,
     },
     {
       label: "Inventory",
-      href: "/inventory",
+      href: "/dashboard/inventory",
       icon: Package,
     },
     {
       label: "Accounting",
-      href: "/accounting",
+      href: "/dashboard/accounting",
       icon: BarChart3,
     },
     {
       label: "Rate History",
-      href: "/rate-history",
+      href: "/dashboard/rate-history",
       icon: TrendingUp,
     },
     {
       label: "Reports",
-      href: "/reports",
+      href: "/dashboard/reports",
       icon: BarChart3,
     },
   ];
@@ -132,9 +132,9 @@ export default function DashboardLayout({
         {/* Footer */}
         <div className="p-4 border-t border-emerald-800 space-y-2">
           <Link
-            href="/settings"
+            href="/dashboard/settings"
             className={`flex items-center px-4 py-3 rounded-lg transition ${
-              isActive("/settings")
+              isActive("/dashboard/settings")
                 ? "bg-emerald-700 text-white"
                 : "text-emerald-100 hover:bg-emerald-800"
             }`}
