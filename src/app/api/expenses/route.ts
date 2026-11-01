@@ -1,4 +1,4 @@
-import { requireAuth, requireRole } from "@/lib/auth-helpers";
+import { requireRole } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -13,15 +13,33 @@ const expenseSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireRole(request, ["OWNER", "ACCOUNTANT"]);
     if (session instanceof NextResponse) return session;
 
-    const expenses = await prisma.expense.findMany({
-      orderBy: { expenseDate: "desc" },
-      take: 20,
-    });
+    // Expense dates are entered in the business's India calendar.
+    const indiaNow = new Date(Date.now() + 330 * 60 * 1000);
+    const year = indiaNow.getUTCFullYear();
+    const month = indiaNow.getUTCMonth();
+    const monthStart = new Date(Date.UTC(year, month, 1) - 330 * 60 * 1000);
+    const nextMonth = new Date(Date.UTC(year, month + 1, 1) - 330 * 60 * 1000);
 
-    return NextResponse.json(expenses);
+    const [expenses, monthSummary] = await Promise.all([
+      prisma.expense.findMany({
+        orderBy: [{ expenseDate: "desc" }, { createdAt: "desc" }],
+        take: 20,
+      }),
+      prisma.expense.aggregate({
+        where: { expenseDate: { gte: monthStart, lt: nextMonth } },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+    ]);
+
+    return NextResponse.json({
+      expenses,
+      monthTotal: monthSummary._sum.amount ?? 0,
+      monthCount: monthSummary._count._all,
+    });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

@@ -167,7 +167,6 @@ export default function InvoiceBillingForm() {
     }
     setProductSearch("");
     setProductSuggestions(false);
-    productSearchRef.current?.focus();
   };
 
   const addOneTimeItem = () => {

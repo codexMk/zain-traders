@@ -1,89 +1,104 @@
 "use client";
 
 import { useEffect } from "react";
-import gsap from "gsap";
-import Lenis from "lenis";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
+import { usePathname } from "next/navigation";
 
 type LenisProviderProps = {
   children: React.ReactNode;
 };
 
 export function LenisProvider({ children }: LenisProviderProps) {
+  const pathname = usePathname();
+
   useEffect(() => {
-    const lenis = new Lenis({
-      duration: 1.15,
-      smoothWheel: true,
-      syncTouch: true,
-      wheelMultiplier: 0.92,
-      touchMultiplier: 1.15,
-    });
+    if (
+      pathname.startsWith("/dashboard") ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
 
-    let rafId = 0;
+    let disposed = false;
+    let cleanup: (() => void) | undefined;
 
-    const raf = (time: number) => {
-      lenis.raf(time);
+    void Promise.all([
+      import("lenis"),
+      import("gsap"),
+      import("gsap/ScrollTrigger"),
+    ]).then(([{ default: Lenis }, { default: gsap }, { ScrollTrigger }]) => {
+      if (disposed) return;
+
+      gsap.registerPlugin(ScrollTrigger);
+      const lenis = new Lenis({
+        duration: 0.78,
+        smoothWheel: true,
+        syncTouch: false,
+        wheelMultiplier: 1,
+        touchMultiplier: 1.1,
+      });
+      let rafId = 0;
+
+      const raf = (time: number) => {
+        lenis.raf(time);
+        rafId = window.requestAnimationFrame(raf);
+      };
+
       rafId = window.requestAnimationFrame(raf);
-    };
 
-    rafId = window.requestAnimationFrame(raf);
+      const onScroll = () => ScrollTrigger.update();
+      lenis.on("scroll", onScroll);
 
-    const onScroll = () => ScrollTrigger.update();
-    lenis.on("scroll", onScroll);
+      const handleDocumentClick = (event: MouseEvent) => {
+        const target = event.target;
 
-    const handleDocumentClick = (event: MouseEvent) => {
-      const target = event.target;
+        if (
+          !(target instanceof Element) ||
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        ) {
+          return;
+        }
 
-      if (
-        !(target instanceof Element) ||
-        event.defaultPrevented ||
-        event.button !== 0 ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.shiftKey ||
-        event.altKey
-      ) {
-        return;
-      }
+        const link = target.closest("a[href]") as HTMLAnchorElement | null;
 
-      const link = target.closest("a[href]") as HTMLAnchorElement | null;
+        if (!link || link.target === "_blank") return;
 
-      if (!link || link.target === "_blank") {
-        return;
-      }
+        const url = new URL(link.href, window.location.href);
 
-      const url = new URL(link.href, window.location.href);
+        if (
+          url.origin !== window.location.origin ||
+          !url.hash ||
+          url.pathname !== window.location.pathname
+        ) {
+          return;
+        }
 
-      if (
-        url.origin !== window.location.origin ||
-        !url.hash ||
-        url.pathname !== window.location.pathname
-      ) {
-        return;
-      }
+        const anchorTarget = document.querySelector<HTMLElement>(url.hash);
+        if (!anchorTarget) return;
 
-      const anchorTarget = document.querySelector<HTMLElement>(url.hash);
+        event.preventDefault();
+        lenis.scrollTo(anchorTarget, { offset: -96 });
+        window.history.replaceState(null, "", `${url.pathname}${url.hash}`);
+      };
 
-      if (!anchorTarget) {
-        return;
-      }
-
-      event.preventDefault();
-      lenis.scrollTo(anchorTarget, { offset: -96 });
-      window.history.replaceState(null, "", `${url.pathname}${url.hash}`);
-    };
-
-    document.addEventListener("click", handleDocumentClick);
+      document.addEventListener("click", handleDocumentClick);
+      cleanup = () => {
+        document.removeEventListener("click", handleDocumentClick);
+        lenis.off("scroll", onScroll);
+        window.cancelAnimationFrame(rafId);
+        lenis.destroy();
+      };
+    }).catch(() => undefined);
 
     return () => {
-      document.removeEventListener("click", handleDocumentClick);
-      lenis.off("scroll", onScroll);
-      window.cancelAnimationFrame(rafId);
-      lenis.destroy();
+      disposed = true;
+      cleanup?.();
     };
-  }, []);
+  }, [pathname]);
 
   return <>{children}</>;
 }
