@@ -192,6 +192,16 @@ img {
     page-break-inside: avoid;
   }
 
+  html[data-print-format="A4"] #invoice-a4 .invoice-print-keep-together {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  html[data-print-format="A4"] #invoice-a4 .invoice-table th,
+  html[data-print-format="A4"] #invoice-a4 .invoice-table td {
+    overflow-wrap: anywhere;
+  }
+
   html[data-print-format="THERMAL_58"] #invoice-thermal,
   html[data-print-format="THERMAL_80"] #invoice-thermal {
     display: block !important;

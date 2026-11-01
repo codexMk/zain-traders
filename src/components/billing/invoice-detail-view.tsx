@@ -7,7 +7,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, Copy, Download, MessageCircle, Printer, RotateCcw, XCircle } from "lucide-react";
 import { amountInWords, formatCurrency } from "@/lib/invoice-utils";
 import { businessInfo } from "@/lib/business-info";
-import { downloadInvoicePdf, type InvoicePdfData } from "@/lib/pdf/invoice-pdf";
 import { permissions } from "@/lib/permissions";
 import { useSession } from "next-auth/react";
 
@@ -37,8 +36,6 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
-  const [signatureLoadError, setSignatureLoadError] = useState(false);
   const [printFormat, setPrintFormat] = useState<PrintFormat>("A4");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMode, setPaymentMode] = useState<"CASH" | "UPI">("CASH");
@@ -62,27 +59,6 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
   useEffect(() => fetchInvoice(), [fetchInvoice]);
 
   useEffect(() => {
-    let active = true;
-    fetch("/images/authorized-signature.png")
-      .then((response) => {
-        if (!response.ok) throw new Error("Could not load the authorized signature");
-        return response.blob();
-      })
-      .then((signatureBlob) => new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Could not read the authorized signature"));
-        reader.onerror = () => reject(reader.error ?? new Error("Could not read the authorized signature"));
-        reader.readAsDataURL(signatureBlob);
-      }))
-      .then((signature) => { if (active) setSignatureDataUrl(signature); })
-      .catch((signatureError: unknown) => {
-        console.error("Could not load the authorized invoice signature", signatureError);
-        if (active) setSignatureLoadError(true);
-      });
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
     if (searchParams.get("print")) {
       const format = searchParams.get("print") === "THERMAL_58" ? "THERMAL_58" : searchParams.get("print") === "THERMAL_80" ? "THERMAL_80" : "A4";
       setPrintFormat(format);
@@ -98,66 +74,20 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
     window.print();
   };
 
-  const getPdfData = (): InvoicePdfData | null => {
-    if (!invoice) return null;
-    return {
-      invoiceNumber: invoice.invoiceNumber,
-      invoiceDate: fmtDate(invoice.invoiceDate),
-      customerName: invoice.customerName || "Walk-in Customer",
-      customerMobile: invoice.customerMobile ?? "",
-      customerAddress: invoice.customerAddress,
-      customerGst: invoice.customerGstNumber,
-      supplierName: invoice.supplierName || businessInfo.nameEnglish,
-      supplierAddress: invoice.supplierAddress || businessInfo.address,
-      supplierGstin: invoice.supplierGstin,
-      supplierPhones: invoice.supplierPhones.length ? invoice.supplierPhones : [...businessInfo.phones],
-      paymentType: invoice.paymentType,
-      paymentStatus: invoice.status,
-      gstEnabled: invoice.gstEnabled,
-      invoiceType: invoice.invoiceType,
-      placeOfSupplyStateCode: invoice.placeOfSupplyStateCode,
-      items: invoice.items.map((item) => ({
-        name: item.productName || item.product?.name || "Item",
-        hsnCode: item.hsnCode,
-        quantity: item.quantity,
-        rate: item.rate,
-        discountAmount: item.discountAmount,
-        gstPercent: item.gstPercent,
-        amount: item.amount,
-        unit: item.unit || item.product?.unit || "",
-        taxableAmount: item.taxableAmount,
-        cgstAmount: item.cgstAmount,
-        sgstAmount: item.sgstAmount,
-        igstAmount: item.igstAmount,
-      })),
-      subtotal: invoice.subtotal,
-      discountAmount: invoice.discountAmount,
-      taxableAmount: invoice.taxableAmount,
-      gstAmount: invoice.gstAmount,
-      cgstAmount: invoice.cgstAmount,
-      sgstAmount: invoice.sgstAmount,
-      igstAmount: invoice.igstAmount,
-      totalAmount: invoice.totalAmount,
-      paidAmount: invoice.paidAmount,
-      balanceDue: Math.max(0, invoice.totalAmount - invoice.paidAmount),
-      deliveryBy: invoice.deliveryBy,
-      notes: invoice.notes,
-    };
-  };
-
   const handleDownload = () => {
-    const data = getPdfData();
-    if (!data) return;
-    try {
-      downloadInvoicePdf({ ...data, authorizedSignatureDataUrl: signatureDataUrl ?? undefined });
-      setError(signatureLoadError
-        ? "PDF downloaded, but the signature could not be included because its image failed to load."
-        : !signatureDataUrl
-          ? "PDF downloaded; the signature image was still loading and may not be included."
-          : "");
-    } catch (pdfError) {
-      setError(pdfError instanceof Error ? `Could not prepare the PDF: ${pdfError.message}` : "Could not prepare the PDF with the authorized signature. Please try again or use Print.");
-    }
+    if (!invoice) return;
+    setError("");
+
+    // Use the browser's text-based print-to-PDF renderer on the same invoice
+    // markup used by the preview. This keeps the saved A4 PDF in sync with it.
+    const originalTitle = document.title;
+    document.title = `${invoice.invoiceNumber} - ${businessInfo.nameEnglish}`;
+    document.documentElement.dataset.printFormat = "A4";
+    window.addEventListener("afterprint", () => {
+      document.title = originalTitle;
+      document.documentElement.dataset.printFormat = printFormat;
+    }, { once: true });
+    window.print();
   };
   const handleWhatsApp = () => {
     if (!invoice) return;
@@ -234,7 +164,7 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
         <div className="flex flex-wrap items-center gap-2">
           <select value={printFormat} onChange={(e) => setPrintFormat(e.target.value as PrintFormat)} className="rounded-xl border bg-white px-3 py-2 text-sm"><option value="A4">A4 Invoice</option><option value="THERMAL_58">58 mm Receipt</option><option value="THERMAL_80">80 mm Receipt</option></select>
           <button onClick={() => handlePrint()} className="flex items-center gap-2 rounded-xl border px-3 py-2"><Printer size={17} />Print</button>
-          <button onClick={handleDownload} className="flex items-center gap-2 rounded-xl bg-brand-emerald px-3 py-2 text-white"><Download size={17} />PDF</button>
+          <button onClick={handleDownload} title="Choose Save as PDF in the browser print dialog" className="flex items-center gap-2 rounded-xl bg-brand-emerald px-3 py-2 text-white"><Download size={17} />Save as PDF</button>
           <button onClick={handleWhatsApp} className="flex items-center gap-2 rounded-xl bg-green-600 px-3 py-2 text-white"><MessageCircle size={17} />WhatsApp</button>
           <button onClick={handleDuplicate} className="flex items-center gap-2 rounded-xl bg-brand-gold px-3 py-2"><Copy size={17} />Duplicate</button>
           {canCancel && invoice.status !== "CANCELLED" && <button onClick={handleCancel} className="flex items-center gap-2 rounded-xl bg-red-600 px-3 py-2 text-white"><XCircle size={17} />Cancel invoice</button>}
@@ -313,7 +243,7 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
         </table>
         </div>
 
-        <section className="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 sm:gap-4">
+        <section className="invoice-print-keep-together mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 sm:gap-4">
           <div className="space-y-3">
             <div className="border border-gray-400 p-3">
               <p className="font-bold">Total in words</p>
@@ -341,7 +271,7 @@ export default function InvoiceDetailView({ invoiceId }: { invoiceId: string }) 
           </div>
         </section>
 
-        <section className="mt-4 grid grid-cols-1 border border-gray-400 text-xs sm:grid-cols-2">
+        <section className="invoice-print-keep-together mt-4 grid grid-cols-1 border border-gray-400 text-xs sm:grid-cols-2">
           <div className="border-b border-gray-400 p-3 sm:border-b-0 sm:border-r">
             <p className="mb-1 font-bold">Terms and Conditions</p>
             <ol className="list-decimal space-y-0.5 pl-4">{businessInfo.invoiceTerms.map((term) => <li key={term}>{term}</li>)}</ol>
