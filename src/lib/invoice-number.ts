@@ -1,36 +1,44 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
+const invoiceSequenceFromExistingInvoices = (year: number) => Prisma.sql`
+  COALESCE((
+    SELECT MAX(SPLIT_PART("invoiceNumber", '-', 3)::INTEGER)
+    FROM "Invoice"
+    WHERE "invoiceNumber" ~ ('^ZT-' || ${year}::TEXT || '-[0-9]+$')
+  ), 0)
+`;
+
 export async function generateInvoiceNumber(): Promise<string> {
   const year = new Date().getFullYear();
-  const prefix = `ZT-${year}-`;
-  const [lastInvoice, counter] = await Promise.all([
-    prisma.invoice.findFirst({
-      where: { invoiceNumber: { startsWith: prefix } },
-      orderBy: { invoiceNumber: "desc" },
-      select: { invoiceNumber: true },
-    }),
-    prisma.invoiceCounter.findUnique({ where: { year }, select: { sequence: true } }),
-  ]);
-  const invoiceSequence = lastInvoice ? Number(lastInvoice.invoiceNumber.slice(prefix.length)) : 0;
-  const next = Math.max(invoiceSequence, counter?.sequence ?? 0) + 1;
-  return `${prefix}${String(next).padStart(4, "0")}`;
+  const [row] = await prisma.$queryRaw<{ sequence: number }[]>`
+    SELECT GREATEST(
+      ${invoiceSequenceFromExistingInvoices(year)},
+      COALESCE((
+        SELECT "sequence"
+        FROM "InvoiceCounter"
+        WHERE "year" = ${year}
+      ), 0)
+    ) + 1 AS "sequence"
+  `;
+
+  if (!row) throw new Error("Could not determine the next invoice number");
+  return `ZT-${year}-${String(row.sequence).padStart(4, "0")}`;
 }
 
 export async function reserveInvoiceNumber(tx: Prisma.TransactionClient): Promise<string> {
   const year = new Date().getFullYear();
   const [row] = await tx.$queryRaw<{ sequence: number }[]>`
-    INSERT INTO "InvoiceCounter" ("year", "sequence")
+    INSERT INTO "InvoiceCounter" AS counter ("year", "sequence")
     VALUES (
       ${year},
-      COALESCE((
-        SELECT MAX(SPLIT_PART("invoiceNumber", '-', 3)::INTEGER)
-        FROM "Invoice"
-        WHERE "invoiceNumber" ~ ('^ZT-' || ${year}::TEXT || '-[0-9]+$')
-      ), 0) + 1
+      ${invoiceSequenceFromExistingInvoices(year)} + 1
     )
-    ON CONFLICT ("year") DO UPDATE SET "sequence" = "InvoiceCounter"."sequence" + 1
+    ON CONFLICT ("year") DO UPDATE
+    SET "sequence" = GREATEST(counter."sequence" + 1, EXCLUDED."sequence")
     RETURNING "sequence"
   `;
+
+  if (!row) throw new Error("Could not reserve an invoice number");
   return `ZT-${year}-${String(row.sequence).padStart(4, "0")}`;
 }

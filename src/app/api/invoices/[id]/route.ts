@@ -1,7 +1,8 @@
 import { requireAuth, requireRole } from "@/lib/auth-helpers";
-import { generateInvoiceNumber } from "@/lib/invoice-number";
+import { reserveInvoiceNumber } from "@/lib/invoice-number";
 import { invoiceStatusFromPayments } from "@/lib/reconciliation";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -167,10 +168,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     const original = await prisma.invoice.findUnique({ where: { id }, include: { items: true } });
     if (!original) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
-    const invoiceNumber = await generateInvoiceNumber();
-    const duplicate = await prisma.invoice.create({
+    const duplicate = await prisma.$transaction(async (tx) => tx.invoice.create({
       data: {
-        invoiceNumber,
+        invoiceNumber: await reserveInvoiceNumber(tx),
         customerId: original.customerId,
         customerName: original.customerName,
         customerMobile: original.customerMobile,
@@ -220,12 +220,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         })) },
       },
       include: { items: true },
-    });
+    }));
     return NextResponse.json(duplicate, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: error.issues[0]?.message ?? "Invalid request" }, { status: 400 });
     if (error instanceof Error && (error.message.startsWith("INVALID:") || error.message.startsWith("NOT_FOUND:"))) {
       return NextResponse.json({ error: error.message.split(":").slice(1).join(":").trim() }, { status: error.message.startsWith("NOT_FOUND:") ? 404 : 400 });
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      console.error("POST /api/invoices/[id] unique constraint conflict", {
+        target: error.meta?.target,
+      });
+      return NextResponse.json(
+        { error: "The invoice could not be duplicated because a conflicting record exists. Please retry." },
+        { status: 409 },
+      );
     }
     console.error("POST /api/invoices/[id] failed", error);
     return NextResponse.json({ error: "Could not duplicate invoice" }, { status: 500 });

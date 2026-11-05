@@ -40,6 +40,7 @@ export default function InvoiceBillingForm() {
   const productSearchRef = useRef<HTMLInputElement>(null);
   const customerSearchRef = useRef<HTMLInputElement>(null);
   const saveKey = useRef("");
+  const submissionInProgress = useRef(false);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -182,7 +183,7 @@ export default function InvoiceBillingForm() {
 
   const submit = async (event: FormEvent | null, mode: "draft" | "save" | "print") => {
     event?.preventDefault();
-    if (isSaving) return;
+    if (isSaving || submissionInProgress.current) return;
     setError("");
     setSuccess("");
     if (!lineItems.length) { setError("Add at least one item"); return; }
@@ -198,6 +199,7 @@ export default function InvoiceBillingForm() {
       if (item.newProduct && item.quantity > item.newProduct.initialStock) { setError(`Initial stock for ${item.name} must cover the invoice quantity`); return; }
     }
 
+    submissionInProgress.current = true;
     setIsSaving(true);
     try {
       const response = await fetch("/api/invoices", {
@@ -234,12 +236,14 @@ export default function InvoiceBillingForm() {
       });
       const result = await response.json();
       if (!response.ok) { setError(result.error || "Could not save invoice"); return; }
+      saveKey.current = crypto.randomUUID();
       setSuccess(mode === "draft" ? "Draft saved" : "Invoice saved");
       const query = mode === "print" ? "?print=A4" : "";
       router.push(`/dashboard/billing/${result.id}${query}`);
     } catch {
       setError("The invoice could not be saved. The same save key will prevent a duplicate if you retry.");
     } finally {
+      submissionInProgress.current = false;
       setIsSaving(false);
     }
   };

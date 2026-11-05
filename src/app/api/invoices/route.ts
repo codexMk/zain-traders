@@ -3,11 +3,35 @@ import { calculateInvoiceTotals } from "@/lib/invoice-utils";
 import { businessInfo } from "@/lib/business-info";
 import { reserveInvoiceNumber } from "@/lib/invoice-number";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+function isPrismaUniqueViolation(error: unknown): error is Prisma.PrismaClientKnownRequestError {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+function isUniqueViolationOn(error: Prisma.PrismaClientKnownRequestError, field: string): boolean {
+  const target = error.meta?.target;
+  return Array.isArray(target)
+    ? target.some((value) => value === field)
+    : typeof target === "string" && target.toLowerCase().includes(field.toLowerCase());
+}
+
+async function retryInvoiceNumberCollision<T>(operation: () => Promise<T>, retries = 2): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (!isPrismaUniqueViolation(error) || !isUniqueViolationOn(error, "invoiceNumber") || attempt >= retries) {
+        throw error;
+      }
+      console.warn("Invoice number collision; retrying atomic allocation", { attempt: attempt + 1 });
+    }
+  }
+}
+
 const createInvoiceSchema = z.object({
-  invoiceNumber: z.string().min(1).optional(),
   customerId: z.string().min(1).nullable().optional(),
   customer: z.object({
     name: z.string().trim().min(1),
@@ -75,12 +99,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  let requestIdempotencyKey: string | undefined;
   try {
     const session = await requireRole(request, ["OWNER", "STAFF"]);
     if (session instanceof NextResponse) return session;
 
     const body = await request.json();
     const data = createInvoiceSchema.parse(body);
+    requestIdempotencyKey = data.idempotencyKey;
 
     if (data.items.some((item) => !item.productId && !item.name?.trim())) {
       return NextResponse.json({ error: "Every invoice item needs a product or description" }, { status: 400 });
@@ -89,6 +115,7 @@ export async function POST(request: NextRequest) {
     if (data.idempotencyKey) {
       const existing = await prisma.invoice.findUnique({
         where: { idempotencyKey: data.idempotencyKey },
+        include: { customer: true, items: { include: { product: true } } },
       });
       if (existing) return NextResponse.json(existing, { status: 200 });
     }
@@ -115,7 +142,7 @@ export async function POST(request: NextRequest) {
       crossState ? "INTER_STATE" : "INTRA_STATE",
     );
 
-    const invoice = await prisma.$transaction(async (tx) => {
+    const invoice = await retryInvoiceNumberCollision(() => prisma.$transaction(async (tx) => {
       let customerId = data.customerId;
       let customerDetails = data.customer;
 
@@ -186,7 +213,7 @@ export async function POST(request: NextRequest) {
 
       return tx.invoice.create({
         data: {
-          invoiceNumber: data.invoiceNumber ?? await reserveInvoiceNumber(tx),
+          invoiceNumber: await reserveInvoiceNumber(tx),
           customerId,
           customerName: customerDetails?.name,
           customerMobile: customerDetails?.mobile,
@@ -246,7 +273,7 @@ export async function POST(request: NextRequest) {
           },
         },
       });
-    });
+    }));
 
     return NextResponse.json(invoice, { status: 201 });
   } catch (error) {
@@ -272,6 +299,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "The selected customer could not be found" },
         { status: 400 },
+      );
+    }
+
+    if (isPrismaUniqueViolation(error)) {
+      if (requestIdempotencyKey) {
+        try {
+          const existing = await prisma.invoice.findUnique({
+            where: { idempotencyKey: requestIdempotencyKey },
+            include: { customer: true, items: { include: { product: true } } },
+          });
+          if (existing) return NextResponse.json(existing, { status: 200 });
+        } catch (lookupError) {
+          console.error("POST /api/invoices idempotency recovery lookup failed", lookupError);
+          return NextResponse.json(
+            { error: "Could not confirm whether the invoice was saved. Retry with the same request." },
+            { status: 500 },
+          );
+        }
+      }
+
+      const invoiceNumberCollision = isUniqueViolationOn(error, "invoiceNumber");
+      console.error("POST /api/invoices unique constraint conflict", {
+        target: error.meta?.target,
+      });
+      return NextResponse.json(
+        {
+          error: invoiceNumberCollision
+            ? "An invoice number conflict occurred. Please retry the same save."
+            : "An invoice with these details already exists. Please retry the same save.",
+        },
+        { status: 409 },
       );
     }
 
